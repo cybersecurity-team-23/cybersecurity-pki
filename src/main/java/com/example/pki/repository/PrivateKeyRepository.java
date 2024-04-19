@@ -4,8 +4,6 @@ import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.PEMWriter;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
-import org.bouncycastle.util.io.pem.PemObjectGenerator;
-import org.bouncycastle.util.io.pem.PemWriter;
 import org.springframework.stereotype.Repository;
 
 import java.io.File;
@@ -62,6 +60,6 @@ public class PrivateKeyRepository {
     public void deleteKey(String alias) {
         String filePath = this.privateKeyFolderPath + alias + ".pem";
         File file = new File(filePath);
-        if (file.exists()) { boolean deleted = file.delete(); }
+        if (file.exists()) { file.delete(); }
     }
 }
