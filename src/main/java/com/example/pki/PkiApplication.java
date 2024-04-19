@@ -9,7 +9,6 @@ import java.security.Security;
 
 @SpringBootApplication
 public class PkiApplication {
-
 	public static void main(String[] args) {
 		ApplicationContext context = SpringApplication.run(PkiApplication.class, args);
 		Security.addProvider(new BouncyCastleProvider());
