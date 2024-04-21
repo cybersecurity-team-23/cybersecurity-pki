@@ -4,6 +4,7 @@ import com.example.pki.model.CertificateType;
 import com.example.pki.model.Request;
 import com.example.pki.model.RequestStatus;
 import com.example.pki.repository.RequestRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -55,13 +56,37 @@ public class RequestService {
         return requestRepository.save(request);
     }
 
-    // TODO: Implement this method
+    // TODO: Actually implement the logic
     public Request approve(Long id) {
-        return null;
+            int updatedCount = requestRepository.approveRequest(id);
+            if (updatedCount == 0) {
+                throw new RuntimeException("Request not found");
+            }
+
+            Optional<Request> request = requestRepository.findById(id);
+
+            if (request.isEmpty()) {
+                throw new RuntimeException("Request not found");
+            }
+
+            return request.get();
     }
 
-    // TODO: Implement this method
+    // TODO: Actually implement the logic
+    @Transactional
     public Request reject(Long id) {
-        return null;
+
+        int updatedCount = requestRepository.rejectRequest(id);
+        if (updatedCount == 0) {
+            throw new RuntimeException("Request not found");
+        }
+
+        Optional<Request> request = requestRepository.findById(id);
+
+        if (request.isEmpty()) {
+            throw new RuntimeException("Request not found");
+        }
+
+        return request.get();
     }
 }
