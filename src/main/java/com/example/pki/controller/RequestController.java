@@ -1,12 +1,9 @@
 package com.example.pki.controller;
 
 import com.example.pki.dto.RequestDTO;
-import com.example.pki.model.CertificateType;
+import com.example.pki.mapper.RequestDTOMapper;
 import com.example.pki.model.Request;
-import com.example.pki.model.RequestStatus;
 import com.example.pki.service.RequestService;
-import jakarta.persistence.AttributeConverter;
-import jakarta.persistence.Converter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,12 +12,15 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.Optional;
 
-
 @RestController
 @RequestMapping(value = "/api/v1/requests")
 public class RequestController {
+    private final RequestService service;
+
     @Autowired
-    private RequestService service;
+    public RequestController(RequestService service) {
+        this.service = service;
+    }
 
     @GetMapping
     public ResponseEntity<?> getAll() {
@@ -75,6 +75,7 @@ public class RequestController {
 
         return new ResponseEntity<>(null, HttpStatus.NOT_IMPLEMENTED);
     }
+
     @PutMapping("/reject/{id}")
     public ResponseEntity<?> declineRequest(@PathVariable Long id) {
 //        Request request = service.reject(id);
