@@ -132,4 +132,35 @@ public class CertificateService {
         }
         return null;
     }
+
+    public static X509Certificate generateX509IntermediateCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber) {
+        try {
+            JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
+            builder = builder.setProvider("BC");
+            ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
+            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
+                    new BigInteger(serialNumber),
+                    startDate,
+                    endDate,
+                    subject.getX500Name(),
+                    subject.getPublicKey());
+
+            // Basic Constraints extension
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
+                new org.bouncycastle.asn1.x509.BasicConstraints(-1));
+
+            // Key Usage extension for keyCertSign
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                    new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.keyCertSign));
+
+
+            X509CertificateHolder certHolder = certGen.build(contentSigner);
+            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
+            certConverter = certConverter.setProvider("BC");
+            return certConverter.getCertificate(certHolder);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }
