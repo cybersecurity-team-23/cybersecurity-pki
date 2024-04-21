@@ -11,6 +11,6 @@ CREATE TABLE requests (
     organisational_unit VARCHAR(255),
     country CHAR(2),
     email VARCHAR(255),
-    type certificate_type,
-    status request_status
+    type VARCHAR(255),
+    status VARCHAR(255)
 );
