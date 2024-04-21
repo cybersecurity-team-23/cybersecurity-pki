@@ -97,6 +97,9 @@ public class CertificateService {
                     new org.bouncycastle.asn1.x509.ExtendedKeyUsage(
                             new org.bouncycastle.asn1.x509.KeyPurposeId[]{org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth}));
 
+            // end entity certificate
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
+                    new org.bouncycastle.asn1.x509.BasicConstraints(0));
 
             X509CertificateHolder certHolder = certGen.build(contentSigner);
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
@@ -123,6 +126,10 @@ public class CertificateService {
             certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
                 new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature));
 
+            // end entity certificate
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
+                    new org.bouncycastle.asn1.x509.BasicConstraints(0));
+
             X509CertificateHolder certHolder = certGen.build(contentSigner);
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
             certConverter = certConverter.setProvider("BC");
@@ -145,7 +152,7 @@ public class CertificateService {
                     subject.getX500Name(),
                     subject.getPublicKey());
 
-            // Basic Constraints extension
+            // intermediate certificate
             certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
                 new org.bouncycastle.asn1.x509.BasicConstraints(-1));
 
