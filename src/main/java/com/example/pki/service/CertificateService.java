@@ -24,7 +24,7 @@ import java.util.Date;
 public class CertificateService {
     public CertificateService() { }
 
-    public Subject generateSubject(User user, PublicKey publicKey) {
+    public static Subject generateSubject(User user, PublicKey publicKey) {
         X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
         builder.addRDN(BCStyle.CN, user.getCommonName());
         builder.addRDN(BCStyle.SURNAME, user.getSurname());
@@ -37,7 +37,7 @@ public class CertificateService {
         return new Subject(publicKey, builder.build());
     }
 
-    private KeyPair generateKeyPair() {
+    public static KeyPair generateKeyPair() {
         try {
             KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
             SecureRandom random = SecureRandom.getInstance("SHA1PRNG", "SUN");
