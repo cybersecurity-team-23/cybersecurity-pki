@@ -69,4 +69,67 @@ public class CertificateService {
         }
         return null;
     }
+
+    public static X509Certificate generateX509HTTPSCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber, String domain) {
+        try {
+            JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
+            builder = builder.setProvider("BC");
+            ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
+            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
+                    new BigInteger(serialNumber),
+                    startDate,
+                    endDate,
+                    subject.getX500Name(),
+                    subject.getPublicKey());
+
+            // Subject Alternative Name
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.subjectAlternativeName, false,
+                new org.bouncycastle.asn1.x509.GeneralNames(
+                        new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.dNSName, domain)));
+
+            // Key Usage
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                    new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature
+                            | org.bouncycastle.asn1.x509.KeyUsage.keyEncipherment));
+
+            // Extended Key Usage extension
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.extendedKeyUsage, true,
+                    new org.bouncycastle.asn1.x509.ExtendedKeyUsage(
+                            new org.bouncycastle.asn1.x509.KeyPurposeId[]{org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth}));
+
+
+            X509CertificateHolder certHolder = certGen.build(contentSigner);
+            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
+            certConverter = certConverter.setProvider("BC");
+            return certConverter.getCertificate(certHolder);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static X509Certificate generateX509SigningCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber) {
+        try {
+            JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
+            builder = builder.setProvider("BC");
+            ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
+            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
+                    new BigInteger(serialNumber),
+                    startDate,
+                    endDate,
+                    subject.getX500Name(),
+                    subject.getPublicKey());
+
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature));
+
+            X509CertificateHolder certHolder = certGen.build(contentSigner);
+            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
+            certConverter = certConverter.setProvider("BC");
+            return certConverter.getCertificate(certHolder);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }
