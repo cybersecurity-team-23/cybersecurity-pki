@@ -15,7 +15,7 @@ import java.util.Enumeration;
 @Repository
 public class KeyStoreRepository {
     private KeyStore keyStore;
-    public String keyStoreFileName = "src/main/resources/keystore/keystore.jks";
+    public static final String keyStoreFileName = "src/main/resources/keystore/keystore.jks";
 
     public KeyStoreRepository() {
         try {

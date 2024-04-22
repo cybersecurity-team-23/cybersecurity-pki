@@ -4,7 +4,6 @@ import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
 import org.springframework.stereotype.Repository;
 
-import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
@@ -12,7 +11,7 @@ import java.util.List;
 
 @Repository
 public class PasswordRepository {
-    private String passwordFilepath = "src/main/resources/keyStorePasswords.csv";
+    private final String passwordFilepath = "src/main/resources/passwords-and-private-keys/keyStorePasswords.csv";
 
     public void writePassword(String keyStoreName, String password) {
         try {
