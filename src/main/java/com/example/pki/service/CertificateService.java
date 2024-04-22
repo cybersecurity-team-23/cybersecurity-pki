@@ -198,6 +198,9 @@ public class CertificateService {
                     new org.bouncycastle.asn1.x509.ExtendedKeyUsage(
                             new org.bouncycastle.asn1.x509.KeyPurposeId[]{org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth}));
 
+            // end entity certificate
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
+                    new org.bouncycastle.asn1.x509.BasicConstraints(0));
 
             X509CertificateHolder certHolder = certGen.build(contentSigner);
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
@@ -223,6 +226,41 @@ public class CertificateService {
 
             certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
                 new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature));
+
+            // end entity certificate
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
+                    new org.bouncycastle.asn1.x509.BasicConstraints(0));
+
+            X509CertificateHolder certHolder = certGen.build(contentSigner);
+            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
+            certConverter = certConverter.setProvider("BC");
+            return certConverter.getCertificate(certHolder);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static X509Certificate generateX509IntermediateCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber) {
+        try {
+            JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
+            builder = builder.setProvider("BC");
+            ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
+            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
+                    new BigInteger(serialNumber),
+                    startDate,
+                    endDate,
+                    subject.getX500Name(),
+                    subject.getPublicKey());
+
+            // intermediate certificate
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
+                new org.bouncycastle.asn1.x509.BasicConstraints(-1));
+
+            // Key Usage extension for keyCertSign
+            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                    new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.keyCertSign));
+
 
             X509CertificateHolder certHolder = certGen.build(contentSigner);
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
