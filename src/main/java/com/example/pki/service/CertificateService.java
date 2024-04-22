@@ -39,7 +39,7 @@ public class CertificateService {
                 );
     }
 
-    private X509Certificate getIssuer(X509Certificate certificate) {
+    public X509Certificate getIssuer(X509Certificate certificate) {
         for (Certificate keyStoreCertificate : keyStoreRepository.getAllCertificates()) {
             if (!(keyStoreCertificate instanceof X509Certificate x509Certificate))
                 continue;
@@ -51,7 +51,7 @@ public class CertificateService {
         return null;
     }
 
-    private boolean isRoot(X509Certificate certificate) {
+    public boolean isRoot(X509Certificate certificate) {
         try {
             certificate.verify(certificate.getPublicKey());
             return certificate.getSubjectX500Principal().equals(certificate.getIssuerX500Principal());
