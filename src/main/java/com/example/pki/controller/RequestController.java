@@ -76,7 +76,7 @@ public class RequestController {
     }
 
     @PutMapping("/reject/{id}")
-    public ResponseEntity<?> rejectRequest(@PathVariable Long id) {
+    public ResponseEntity<RequestDTO> rejectRequest(@PathVariable Long id) {
         try {
             Request request = requestService.reject(id);
             return new ResponseEntity<>(RequestDTOMapper.fromRequestToDTO(request), HttpStatus.OK);

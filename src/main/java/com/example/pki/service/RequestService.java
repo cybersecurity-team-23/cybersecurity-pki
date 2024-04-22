@@ -69,10 +69,8 @@ public class RequestService {
             return request.get();
     }
 
-    // TODO: Actually implement the logic
     @Transactional
     public Request reject(Long id) {
-
         int updatedCount = requestRepository.rejectRequest(id);
         if (updatedCount == 0) {
             throw new RuntimeException("Request not found");
