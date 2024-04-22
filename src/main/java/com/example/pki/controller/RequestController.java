@@ -68,20 +68,22 @@ public class RequestController {
     }
 
     @PutMapping("/approve/{id}")
-    public ResponseEntity<?> acceptRequest(@PathVariable Long id) {
-//         Request request = service.approve(id);
-//
-//         return new ResponseEntity<>(RequestDTOMapper.fromRequestToDTO(request), HttpStatus.OK);
-
-        return new ResponseEntity<>(null, HttpStatus.NOT_IMPLEMENTED);
+    public ResponseEntity<?> approveRequest(@PathVariable Long id) {
+        try {
+            Request request = service.approve(id);
+            return new ResponseEntity<>(RequestDTOMapper.fromRequestToDTO(request), HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
     }
 
     @PutMapping("/reject/{id}")
-    public ResponseEntity<?> declineRequest(@PathVariable Long id) {
-//        Request request = service.reject(id);
-//
-//        return new ResponseEntity<>(RequestDTOMapper.fromRequestToDTO(request), HttpStatus.OK);
-
-        return new ResponseEntity<>(null, HttpStatus.NOT_IMPLEMENTED);
+    public ResponseEntity<?> rejectRequest(@PathVariable Long id) {
+        try {
+            Request request = service.reject(id);
+            return new ResponseEntity<>(RequestDTOMapper.fromRequestToDTO(request), HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
     }
 }

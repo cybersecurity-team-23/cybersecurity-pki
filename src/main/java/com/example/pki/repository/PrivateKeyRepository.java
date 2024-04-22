@@ -14,7 +14,7 @@ import java.security.PrivateKey;
 
 @Repository
 public class PrivateKeyRepository {
-    private String privateKeyFolderPath = "src/main/resources/private-keys/";
+    private final String privateKeyFolderPath = "src/main/resources/passwords-and-private-keys/";
 
     public PrivateKeyRepository() {}
 
