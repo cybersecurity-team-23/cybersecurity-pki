@@ -74,7 +74,7 @@ public class CertificateService {
             return getRoot(issuerCertificate);
     }
 
-    private Set<X509Certificate> getCertificatesSignedBy(X509Certificate certificate) {
+    public Set<X509Certificate> getCertificatesSignedBy(X509Certificate certificate) {
         Set<X509Certificate> certificates = new HashSet<>();
         for (Certificate keyStoreCertificate : keyStoreRepository.getAllCertificates()) {
             if (!(keyStoreCertificate instanceof X509Certificate x509Certificate))

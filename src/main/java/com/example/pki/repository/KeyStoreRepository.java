@@ -88,12 +88,29 @@ public class KeyStoreRepository {
         }
     }
 
-    public void deleteCertificate(String alias) {
+    public void deleteCertificate(X509Certificate cert, PrivateKeyRepository privateKeyRepository, CertificateService certificateService) {
+        String alias = getAliasFromCertificate(cert);
+        Set<X509Certificate> children = certificateService.getCertificatesSignedBy(cert);
         try {
             keyStore.deleteEntry(alias);
+            privateKeyRepository.deleteKey(alias);
         } catch (KeyStoreException e) {
             e.printStackTrace();
         }
+        for (X509Certificate certificate: children) deleteCertificate(certificate, privateKeyRepository, certificateService);
+    }
+
+    public String getAliasFromCertificate(X509Certificate cert) {
+        try {
+            Enumeration<String> aliases = keyStore.aliases();
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                if (cert.equals(keyStore.getCertificate(alias))) return alias;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     public Set<Certificate> getAllCertificates() {
