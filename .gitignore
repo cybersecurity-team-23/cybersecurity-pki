@@ -32,9 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+### DB ###
+.env
+
 ### Crypto ###
 src/main/resources/passwords-and-private-keys
 src/main/resources/keystore
-
-### DB ###
-.env

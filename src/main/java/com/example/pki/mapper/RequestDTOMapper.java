@@ -1,7 +1,6 @@
-package com.example.pki.controller;
+package com.example.pki.mapper;
 
 import com.example.pki.dto.RequestDTO;
-import com.example.pki.model.CertificateType;
 import com.example.pki.model.Request;
 
 public class RequestDTOMapper {

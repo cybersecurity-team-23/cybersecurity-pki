@@ -9,8 +9,9 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Set;
 
 @Repository
 public class KeyStoreRepository {
@@ -20,9 +21,7 @@ public class KeyStoreRepository {
     public KeyStoreRepository() {
         try {
             keyStore = KeyStore.getInstance("JKS", "SUN");
-        } catch (KeyStoreException e) {
-            e.printStackTrace();
-        } catch (NoSuchProviderException e) {
+        } catch (KeyStoreException | NoSuchProviderException e) {
             e.printStackTrace();
         }
     }
@@ -36,13 +35,7 @@ public class KeyStoreRepository {
                 // create a new KeyStore
                 keyStore.load(null, password);
             }
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (CertificateException e) {
-            e.printStackTrace();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (NoSuchAlgorithmException | CertificateException | IOException e) {
             e.printStackTrace();
         }
     }
@@ -50,15 +43,7 @@ public class KeyStoreRepository {
     public void writeKeyStore(String fileName, char[] password) {
         try {
             keyStore.store(new FileOutputStream(fileName), password);
-        } catch (KeyStoreException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (CertificateException e) {
-            e.printStackTrace();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
             e.printStackTrace();
         }
     }
@@ -71,17 +56,8 @@ public class KeyStoreRepository {
             PrivateKey privateKey = (PrivateKey) keyStore.getKey(alias, keyPassword.toCharArray());
             X500Name issuerName = new JcaX509CertificateHolder((X509Certificate) cert).getSubject();
             return new Issuer(privateKey, cert.getPublicKey(), issuerName);
-        } catch (KeyStoreException e) {
-            e.printStackTrace();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (CertificateException e) {
-            e.printStackTrace();
-        } catch (UnrecoverableKeyException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | UnrecoverableKeyException |
+                 IOException e) {
             e.printStackTrace();
         }
         return null;
@@ -96,17 +72,8 @@ public class KeyStoreRepository {
                 java.security.cert.Certificate cert = ks.getCertificate(alias);
                 return cert;
             }
-        } catch (KeyStoreException e) {
-            e.printStackTrace();
-        } catch (NoSuchProviderException e) {
-            e.printStackTrace();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (CertificateException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (KeyStoreException | NoSuchProviderException | NoSuchAlgorithmException | CertificateException |
+                 IOException e) {
             e.printStackTrace();
         }
         return null;
@@ -128,8 +95,8 @@ public class KeyStoreRepository {
         }
     }
 
-    public ArrayList<Certificate> getAllCertificates() {
-        ArrayList<Certificate> certs = new ArrayList<>();
+    public Set<Certificate> getAllCertificates() {
+        Set<Certificate> certs = new HashSet<>();
         try {
             Enumeration<String> aliases = keyStore.aliases();
             while (aliases.hasMoreElements()) {

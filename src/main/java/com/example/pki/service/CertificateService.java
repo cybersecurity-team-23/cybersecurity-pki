@@ -1,8 +1,11 @@
 package com.example.pki.service;
 
+import com.example.pki.dto.CertificateDto;
 import com.example.pki.model.Issuer;
 import com.example.pki.model.Subject;
 import com.example.pki.model.User;
+import com.example.pki.repository.KeyStoreRepository;
+import com.example.pki.repository.PasswordRepository;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -12,17 +15,111 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.springframework.stereotype.Service;
+
 import java.math.BigInteger;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.PublicKey;
-import java.security.SecureRandom;
+import java.security.*;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.Date;
+import java.util.*;
 
 @Service
 public class CertificateService {
-    public CertificateService() { }
+    private final KeyStoreRepository keyStoreRepository;
+
+    public CertificateService(KeyStoreRepository keyStoreRepository, PasswordRepository passwordRepository) {
+        this.keyStoreRepository = keyStoreRepository;
+
+        String[] splitKeyStorePath = KeyStoreRepository.keyStoreFileName.split("/");
+        String keyStoreName = splitKeyStorePath[splitKeyStorePath.length - 1].split("\\.")[0];
+        keyStoreRepository
+                .readKeyStore(
+                        KeyStoreRepository.keyStoreFileName,
+                        passwordRepository.getPassword(keyStoreName).toCharArray()
+                );
+    }
+
+    private X509Certificate getIssuer(X509Certificate certificate) {
+        for (Certificate keyStoreCertificate : keyStoreRepository.getAllCertificates()) {
+            if (!(keyStoreCertificate instanceof X509Certificate x509Certificate))
+                continue;
+
+            if (x509Certificate.getSubjectX500Principal().equals(certificate.getIssuerX500Principal()))
+                return x509Certificate;
+        }
+
+        return null;
+    }
+
+    private boolean isRoot(X509Certificate certificate) {
+        try {
+            certificate.verify(certificate.getPublicKey());
+            return certificate.getSubjectX500Principal().equals(certificate.getIssuerX500Principal());
+        } catch (CertificateException | NoSuchAlgorithmException | SignatureException | InvalidKeyException |
+                 NoSuchProviderException e) {
+            return false;
+        }
+    }
+
+    private X509Certificate getRoot(X509Certificate certificate) {
+        certificate.getIssuerX500Principal().getName();
+        certificate.getSerialNumber();
+        X509Certificate issuerCertificate = getIssuer(certificate);
+        if (issuerCertificate == null)
+            return null;
+
+        if (isRoot(issuerCertificate))
+            return issuerCertificate;
+        else
+            return getRoot(issuerCertificate);
+    }
+
+    private Set<X509Certificate> getCertificatesSignedBy(X509Certificate certificate) {
+        Set<X509Certificate> certificates = new HashSet<>();
+        for (Certificate keyStoreCertificate : keyStoreRepository.getAllCertificates()) {
+            if (!(keyStoreCertificate instanceof X509Certificate x509Certificate))
+                continue;
+
+            if (
+                    // To prevent infinite recursing when finding certificates signed by root, since it is self-signed
+                    !x509Certificate.equals(certificate) &&
+                    x509Certificate.getIssuerX500Principal().equals(certificate.getSubjectX500Principal())
+            )
+                certificates.add(x509Certificate);
+        }
+
+        return certificates;
+    }
+
+    private CertificateDto formCertificateTree(X509Certificate rootCertificate) {
+        CertificateDto certificateTree = new CertificateDto(rootCertificate.getSigAlgName(), true);
+        Set<X509Certificate> certificatesSignedByRoot = getCertificatesSignedBy(rootCertificate);
+        if (certificatesSignedByRoot.isEmpty())
+            return certificateTree;
+
+        for (X509Certificate certificate : certificatesSignedByRoot)
+            certificateTree.getChildren().add(formCertificateTree(certificate));
+
+        return certificateTree;
+    }
+
+    public CertificateDto getCertificateTree() {
+        Optional<X509Certificate> randomCertificate =
+                keyStoreRepository
+                        .getAllCertificates()
+                        .stream()
+                        .filter(certificate -> certificate instanceof X509Certificate)
+                        .map(certificate -> (X509Certificate) certificate)
+                        .findAny();
+        if (randomCertificate.isEmpty())
+            return null;
+
+        // TODO: Check if root is null
+
+        X509Certificate rootCertificate = getRoot(randomCertificate.get());
+        assert rootCertificate != null;
+        return formCertificateTree(rootCertificate);
+    }
 
     public Subject generateSubject(User user, PublicKey publicKey) {
         X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
@@ -51,18 +148,22 @@ public class CertificateService {
 
     public static X509Certificate generateX509Certificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber) {
         try {
-            JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
-            builder = builder.setProvider("BC");
+            JcaContentSignerBuilder builder =
+                    new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider("BC");
             ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
-            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
+
+            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(
+                    issuer.getX500Name(),
                     new BigInteger(serialNumber),
                     startDate,
                     endDate,
                     subject.getX500Name(),
-                    subject.getPublicKey());
+                    subject.getPublicKey()
+            );
             X509CertificateHolder certHolder = certGen.build(contentSigner);
-            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
-            certConverter = certConverter.setProvider("BC");
+
+            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter().setProvider("BC");
+
             return certConverter.getCertificate(certHolder);
         } catch (Exception e) {
             e.printStackTrace();
