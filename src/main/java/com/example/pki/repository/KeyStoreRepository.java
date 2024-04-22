@@ -1,6 +1,7 @@
 package com.example.pki.repository;
 
 import com.example.pki.model.Issuer;
+import com.example.pki.service.CertificateService;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.springframework.stereotype.Repository;
@@ -108,5 +109,30 @@ public class KeyStoreRepository {
             e.printStackTrace();
         }
         return certs;
+    }
+
+    public boolean isCertValid(String alias, String keyStorePassword, CertificateService certificateService) {
+        X509Certificate currentX509 = (X509Certificate) readCertificate(keyStoreFileName, keyStorePassword, alias);;
+        X509Certificate parentX509 = certificateService.getIssuer(currentX509);
+        while (!certificateService.isRoot(currentX509)) {
+            try {
+                currentX509.checkValidity();
+                currentX509.verify(parentX509.getPublicKey());
+            } catch (Exception e) {
+                return false;
+            }
+            currentX509 = parentX509;
+            parentX509 = certificateService.getIssuer(currentX509);
+        }
+
+        // check root
+        try {
+            currentX509.checkValidity();
+            currentX509.verify(currentX509.getPublicKey());
+        } catch (Exception e) {
+            return false;
+        }
+
+        return true;
     }
 }
