@@ -1,5 +1,6 @@
 package com.example.pki.mapper;
 
+import com.example.pki.dto.CreateRequestDTO;
 import com.example.pki.dto.RequestDTO;
 import com.example.pki.model.Request;
 
@@ -19,6 +20,19 @@ public class RequestDTOMapper {
         );
     }
 
+    public static CreateRequestDTO fromRequestToCreateDTO(Request request) {
+        return new CreateRequestDTO(
+                request.getCommonName(),
+                request.getSurname(),
+                request.getGivenName(),
+                request.getOrganisation(),
+                request.getOrganisationalUnit(),
+                request.getCountry(),
+                request.getEmail(),
+                request.getUid()
+        );
+    }
+
     public static Request fromDTOtoRequest(RequestDTO dto) {
         return new Request(
                 dto.getCommonName(),
@@ -32,4 +46,5 @@ public class RequestDTOMapper {
                 dto.getStatus()
         );
     }
+
 }

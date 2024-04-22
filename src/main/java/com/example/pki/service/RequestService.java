@@ -35,20 +35,19 @@ public class RequestService {
             String organisationalUnit,
             String country,
             String email,
-            Long uid,
-            RequestStatus status
+            Long uid
     ) {
 
         Request request = new Request(
-            commonName,
-            surname,
-            givenName,
-            organisation,
-            organisationalUnit,
-            country,
-            email,
-            uid,
-            status
+                commonName,
+                surname,
+                givenName,
+                organisation,
+                organisationalUnit,
+                country,
+                email,
+                uid,
+                RequestStatus.PENDING
         );
 
         return requestRepository.save(request);

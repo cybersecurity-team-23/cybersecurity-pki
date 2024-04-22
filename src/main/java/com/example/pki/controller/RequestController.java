@@ -1,5 +1,6 @@
 package com.example.pki.controller;
 
+import com.example.pki.dto.CreateRequestDTO;
 import com.example.pki.dto.RequestDTO;
 import com.example.pki.mapper.RequestDTOMapper;
 import com.example.pki.model.Request;
@@ -46,8 +47,8 @@ public class RequestController {
         return new ResponseEntity<>(RequestDTOMapper.fromRequestToDTO(requestResponse), HttpStatus.OK);
     }
 
-    @PostMapping
-    public ResponseEntity<RequestDTO> createRequest(@RequestBody RequestDTO dto) {
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<CreateRequestDTO> createRequest(@RequestBody CreateRequestDTO dto) {
         Request request = requestService.create(
                 dto.getCommonName(),
                 dto.getSurname(),
@@ -56,11 +57,10 @@ public class RequestController {
                 dto.getOrganisationalUnit(),
                 dto.getCountry(),
                 dto.getEmail(),
-                dto.getUid(),
-                dto.getStatus()
+                dto.getUid()
         );
 
-        RequestDTO requestDto = RequestDTOMapper.fromRequestToDTO(request);
+        CreateRequestDTO requestDto = RequestDTOMapper.fromRequestToCreateDTO(request);
 
         return new ResponseEntity<>(requestDto, HttpStatus.CREATED);
     }
