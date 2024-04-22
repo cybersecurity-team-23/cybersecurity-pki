@@ -1,6 +1,5 @@
 package com.example.pki.service;
 
-import com.example.pki.model.CertificateType;
 import com.example.pki.model.Request;
 import com.example.pki.model.RequestStatus;
 import com.example.pki.repository.RequestRepository;
@@ -11,14 +10,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.List;
 import java.util.Optional;
 
-
 @Service
 public class RequestService {
-    @Autowired
-    private RequestRepository requestRepository;
+    private final RequestRepository requestRepository;
 
-    public List<Request> getAll() {
-        return requestRepository.findAll();
+    @Autowired
+    public RequestService(RequestRepository requestRepository) {
+        this.requestRepository = requestRepository;
+    }
+
+    public List<Request> getAllUnresolved() {
+        return requestRepository.findAllByStatus(RequestStatus.PENDING);
     }
 
     public Optional<Request> findById(Long id) {
@@ -26,8 +28,6 @@ public class RequestService {
     }
 
     public Request create(
-            Long id,
-            Long issuerSerialNumber,
             String commonName,
             String surname,
             String givenName,
@@ -35,13 +35,11 @@ public class RequestService {
             String organisationalUnit,
             String country,
             String email,
-            CertificateType type,
+            Long uid,
             RequestStatus status
     ) {
 
         Request request = new Request(
-            id,
-            issuerSerialNumber,
             commonName,
             surname,
             givenName,
@@ -49,7 +47,7 @@ public class RequestService {
             organisationalUnit,
             country,
             email,
-            type,
+            uid,
             status
         );
 

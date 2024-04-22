@@ -6,27 +6,27 @@ import com.example.pki.model.Request;
 import com.example.pki.service.RequestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.Optional;
+import java.util.*;
 
 @RestController
 @RequestMapping(value = "/api/v1/requests")
 public class RequestController {
-    private final RequestService service;
+    private final RequestService requestService;
 
     @Autowired
     public RequestController(RequestService service) {
-        this.service = service;
+        this.requestService = service;
     }
 
-    @GetMapping
-    public ResponseEntity<?> getAll() {
-        ArrayList<RequestDTO> requests = new ArrayList<>();
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Collection<RequestDTO>> getAllUnresolved() {
+        Set<RequestDTO> requests = new HashSet<>();
 
-        for (Request request : service.getAll()) {
+        for (Request request : requestService.getAllUnresolved()) {
             requests.add(RequestDTOMapper.fromRequestToDTO(request));
         }
         
@@ -35,7 +35,7 @@ public class RequestController {
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getRequestById(@PathVariable Long id) {
-        Optional<Request> request = service.findById(id);
+        Optional<Request> request = requestService.findById(id);
 
         if (request.isEmpty()) {
             return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
@@ -47,30 +47,28 @@ public class RequestController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createRequest(@RequestBody RequestDTO dto) {
-        Request request = RequestDTOMapper.fromDTOtoRequest(dto);
-
-        service.create(
-            request.getId(),
-            request.getIssuerSerialNumber(),
-            request.getCommonName(),
-            request.getSurname(),
-            request.getGivenName(),
-            request.getOrganisation(),
-            request.getOrganisationalUnit(),
-            request.getCountry(),
-            request.getEmail(),
-            request.getType(),
-            request.getStatus()
+    public ResponseEntity<RequestDTO> createRequest(@RequestBody RequestDTO dto) {
+        Request request = requestService.create(
+                dto.getCommonName(),
+                dto.getSurname(),
+                dto.getGivenName(),
+                dto.getOrganisation(),
+                dto.getOrganisationalUnit(),
+                dto.getCountry(),
+                dto.getEmail(),
+                dto.getUid(),
+                dto.getStatus()
         );
 
-        return new ResponseEntity<>(request, HttpStatus.CREATED);
+        RequestDTO requestDto = RequestDTOMapper.fromRequestToDTO(request);
+
+        return new ResponseEntity<>(requestDto, HttpStatus.CREATED);
     }
 
     @PutMapping("/approve/{id}")
     public ResponseEntity<?> approveRequest(@PathVariable Long id) {
         try {
-            Request request = service.approve(id);
+            Request request = requestService.approve(id);
             return new ResponseEntity<>(RequestDTOMapper.fromRequestToDTO(request), HttpStatus.OK);
         } catch (RuntimeException e) {
             return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
@@ -80,7 +78,7 @@ public class RequestController {
     @PutMapping("/reject/{id}")
     public ResponseEntity<?> rejectRequest(@PathVariable Long id) {
         try {
-            Request request = service.reject(id);
+            Request request = requestService.reject(id);
             return new ResponseEntity<>(RequestDTOMapper.fromRequestToDTO(request), HttpStatus.OK);
         } catch (RuntimeException e) {
             return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
