@@ -1,3 +1,8 @@
+## Contributors
+- Dragoslav Tamindžija, SV47/2021
+- Darko Svilar, SV50/2021
+- Teodor Đurić, SV67/2021
+
 ## dummy data and schema in db-stuff/init/
 
 ## copy .env.example to .env and adjust vals
