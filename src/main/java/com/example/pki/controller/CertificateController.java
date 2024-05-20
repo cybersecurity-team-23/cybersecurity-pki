@@ -1,8 +1,8 @@
 package com.example.pki.controller;
 
 import com.example.pki.dto.CertificateDto;
-import com.example.pki.model.CertificateAliasDTO;
-import com.example.pki.model.CertificateValidityDTO;
+import com.example.pki.dto.CertificateAliasDTO;
+import com.example.pki.dto.CertificateValidityDTO;
 import com.example.pki.repository.KeyStoreRepository;
 import com.example.pki.repository.PasswordRepository;
 import com.example.pki.repository.PrivateKeyRepository;
@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 
 @RestController
@@ -37,10 +38,14 @@ public class CertificateController {
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CertificateDto> getAllCertificates() {
-        return new ResponseEntity<>(certificateService.getCertificateTree(), HttpStatus.OK);
+        try {
+            return new ResponseEntity<>(certificateService.getCertificateTree(), HttpStatus.OK);
+        } catch (CertificateEncodingException e) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
     }
 
-    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(path="/valid", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CertificateValidityDTO> isCertificateValid(@RequestBody CertificateAliasDTO certificateAliasDTO) {
         String keyStorePass = passwordRepository.getPassword("keystore");
         boolean isValid = keyStoreRepository.isCertValid(certificateAliasDTO.getAlias(), keyStorePass, certificateService);

@@ -11,6 +11,7 @@ import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.*;
@@ -91,8 +93,25 @@ public class CertificateService {
         return certificates;
     }
 
-    private CertificateDto formCertificateTree(X509Certificate rootCertificate) {
-        CertificateDto certificateTree = new CertificateDto(rootCertificate.getSigAlgName(), true);
+    public boolean isEndEntity(X509Certificate certificate) {
+        boolean[] keyUsages = certificate.getKeyUsage();
+        if (keyUsages == null)
+            return true;
+
+        return certificate.getBasicConstraints() == -1 ||
+                !certificate.getKeyUsage()[org.bouncycastle.asn1.x509.KeyUsage.keyCertSign];
+    }
+
+    private CertificateDto formCertificateTree(X509Certificate rootCertificate) throws CertificateEncodingException {
+        JcaX509CertificateHolder jcaX509CertificateHolder = new JcaX509CertificateHolder(rootCertificate);
+        CertificateDto certificateTree =
+                new CertificateDto(
+                        rootCertificate,
+                        jcaX509CertificateHolder.getIssuer(),
+                        jcaX509CertificateHolder.getSubject(),
+                        isEndEntity(rootCertificate),
+                        isRoot(rootCertificate)
+                );
         Set<X509Certificate> certificatesSignedByRoot = getCertificatesSignedBy(rootCertificate);
         if (certificatesSignedByRoot.isEmpty())
             return certificateTree;
@@ -103,7 +122,7 @@ public class CertificateService {
         return certificateTree;
     }
 
-    public CertificateDto getCertificateTree() {
+    public CertificateDto getCertificateTree() throws CertificateEncodingException {
         Optional<X509Certificate> randomCertificate =
                 keyStoreRepository
                         .getAllCertificates()
@@ -260,7 +279,6 @@ public class CertificateService {
             // Key Usage extension for keyCertSign
             certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
                     new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.keyCertSign));
-
 
             X509CertificateHolder certHolder = certGen.build(contentSigner);
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();

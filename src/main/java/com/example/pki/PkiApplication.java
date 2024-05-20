@@ -15,7 +15,7 @@ public class PkiApplication {
 		 if (!keystoreFolder.exists() || !keystoreFolder.isDirectory()) {
 			 keystoreFolder.mkdir();
 			 System.out.println("Generating keystore folder");
-        }
+         }
 
 		 // password and key folder
 		 File passwordFolder = new File("src/main/resources/passwords-and-private-keys");
