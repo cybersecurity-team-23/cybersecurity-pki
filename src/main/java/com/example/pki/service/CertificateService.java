@@ -98,8 +98,7 @@ public class CertificateService {
         if (keyUsages == null)
             return true;
 
-        return certificate.getBasicConstraints() == -1 ||
-                !certificate.getKeyUsage()[org.bouncycastle.asn1.x509.KeyUsage.keyCertSign];
+        return certificate.getBasicConstraints() == -1 || !certificate.getKeyUsage()[5];
     }
 
     private CertificateDto formCertificateTree(X509Certificate rootCertificate) throws CertificateEncodingException {
