@@ -1,4 +1,4 @@
-package com.example.pki.model;
+package com.example.pki.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -7,8 +7,8 @@ import lombok.Setter;
 
 @Getter
 @Setter
-@NoArgsConstructor
 @AllArgsConstructor
-public class CertificateValidityDTO {
-    private boolean isValid;
+@NoArgsConstructor
+public class CertificateAliasDTO {
+    private String alias;
 }

@@ -3,7 +3,11 @@ package com.example.pki.dto;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.bouncycastle.asn1.x500.X500Name;
 
+import java.security.cert.X509Certificate;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -11,13 +15,29 @@ import java.util.Set;
 @Getter
 @Setter
 public class CertificateDto {
-    private String someData;
+    private String serialNumber;
+    private String signatureAlgorithm;
+    private X500NameDto issuer;
+    private LocalDate validFrom;
+    private LocalDate validTo;
+    private X500NameDto subject;
+    private Set<String> extensions;
     private boolean isEndEntity;
-    private Set<CertificateDto> children;
+    private boolean isRoot;
+    private Set<CertificateDto> children = new HashSet<>();
 
-    public CertificateDto(String someData, boolean isEndEntity) {
-        this.someData = someData;
+    public CertificateDto(X509Certificate x509Certificate, X500Name issuer, X500Name subject, boolean isEndEntity,
+                          boolean isRoot) {
+        serialNumber = x509Certificate.getSerialNumber().toString();
+        signatureAlgorithm = x509Certificate.getSigAlgName();
+        this.issuer = new X500NameDto(issuer);
+        ZoneId zoneId = ZoneId.systemDefault();
+        validFrom = LocalDate.ofInstant(x509Certificate.getNotBefore().toInstant(), zoneId);
+        validTo = LocalDate.ofInstant(x509Certificate.getNotAfter().toInstant(), zoneId);
+        this.subject = new X500NameDto(subject);
+        extensions = new HashSet<>();
         this.isEndEntity = isEndEntity;
-        children = new HashSet<>();
+        this.isRoot = isRoot;
+        this.children = new HashSet<>();
     }
 }
