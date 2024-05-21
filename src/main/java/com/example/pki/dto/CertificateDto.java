@@ -28,7 +28,7 @@ public class CertificateDto {
 
     public CertificateDto(X509Certificate x509Certificate, X500Name issuer, X500Name subject, boolean isEndEntity,
                           boolean isRoot) {
-        serialNumber = x509Certificate.getSerialNumber().toString();
+        serialNumber = x509Certificate.getSerialNumber().toString(16);
         signatureAlgorithm = x509Certificate.getSigAlgName();
         this.issuer = new X500NameDto(issuer);
         ZoneId zoneId = ZoneId.systemDefault();

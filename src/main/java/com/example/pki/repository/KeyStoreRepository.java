@@ -1,9 +1,6 @@
 package com.example.pki.repository;
 
-import com.example.pki.model.Issuer;
 import com.example.pki.service.CertificateService;
-import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.springframework.stereotype.Repository;
 import java.io.*;
 import java.security.*;
@@ -18,6 +15,7 @@ import java.util.Set;
 public class KeyStoreRepository {
     private KeyStore keyStore;
     public static final String keyStoreFileName = "src/main/resources/keystore/keystore.jks";
+    public static final String keyStoreName = "keystore";
 
     public KeyStoreRepository() {
         try {
@@ -49,29 +47,13 @@ public class KeyStoreRepository {
         }
     }
 
-    public Issuer readIssuer(String keyStoreFile, String alias, String keyStorePassword, String keyPassword) {
-        try {
-            BufferedInputStream in = new BufferedInputStream(new FileInputStream(keyStoreFile));
-            keyStore.load(in, keyStorePassword.toCharArray());
-            Certificate cert = keyStore.getCertificate(alias);
-            PrivateKey privateKey = (PrivateKey) keyStore.getKey(alias, keyPassword.toCharArray());
-            X500Name issuerName = new JcaX509CertificateHolder((X509Certificate) cert).getSubject();
-            return new Issuer(privateKey, cert.getPublicKey(), issuerName);
-        } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | UnrecoverableKeyException |
-                 IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
     public Certificate readCertificate(String keyStoreFile, String keyStorePassword, String alias) {
         try {
             KeyStore ks = KeyStore.getInstance("JKS", "SUN");
             BufferedInputStream in = new BufferedInputStream(new FileInputStream(keyStoreFile));
             ks.load(in, keyStorePassword.toCharArray());
             if(ks.isCertificateEntry(alias)) {
-                java.security.cert.Certificate cert = ks.getCertificate(alias);
-                return cert;
+                return ks.getCertificate(alias);
             }
         } catch (KeyStoreException | NoSuchProviderException | NoSuchAlgorithmException | CertificateException |
                  IOException e) {
@@ -126,30 +108,5 @@ public class KeyStoreRepository {
             e.printStackTrace();
         }
         return certs;
-    }
-
-    public boolean isCertValid(String alias, String keyStorePassword, CertificateService certificateService) {
-        X509Certificate currentX509 = (X509Certificate) readCertificate(keyStoreFileName, keyStorePassword, alias);;
-        X509Certificate parentX509 = certificateService.getIssuer(currentX509);
-        while (!certificateService.isRoot(currentX509)) {
-            try {
-                currentX509.checkValidity();
-                currentX509.verify(parentX509.getPublicKey());
-            } catch (Exception e) {
-                return false;
-            }
-            currentX509 = parentX509;
-            parentX509 = certificateService.getIssuer(currentX509);
-        }
-
-        // check root
-        try {
-            currentX509.checkValidity();
-            currentX509.verify(currentX509.getPublicKey());
-        } catch (Exception e) {
-            return false;
-        }
-
-        return true;
     }
 }

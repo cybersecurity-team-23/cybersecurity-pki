@@ -28,6 +28,7 @@ import java.util.*;
 @Service
 public class CertificateService {
     private final KeyStoreRepository keyStoreRepository;
+    private final PasswordRepository passwordRepository;
 
     public CertificateService(KeyStoreRepository keyStoreRepository, PasswordRepository passwordRepository) {
         this.keyStoreRepository = keyStoreRepository;
@@ -39,6 +40,7 @@ public class CertificateService {
                         KeyStoreRepository.keyStoreFileName,
                         passwordRepository.getPassword(keyStoreName).toCharArray()
                 );
+        this.passwordRepository = passwordRepository;
     }
 
     public X509Certificate getIssuer(X509Certificate certificate) {
@@ -137,6 +139,39 @@ public class CertificateService {
         X509Certificate rootCertificate = getRoot(randomCertificate.get());
         assert rootCertificate != null;
         return formCertificateTree(rootCertificate);
+    }
+
+    public boolean isCertValid(String alias) {
+        X509Certificate currentX509 =
+                (X509Certificate) keyStoreRepository.readCertificate(
+                        KeyStoreRepository.keyStoreFileName,
+                        passwordRepository.getPassword(KeyStoreRepository.keyStoreName),
+                        alias
+                );
+        if (currentX509 == null)
+            return false;
+
+        X509Certificate parentX509 = getIssuer(currentX509);
+        while (!isRoot(currentX509)) {
+            try {
+                currentX509.checkValidity();
+                currentX509.verify(parentX509.getPublicKey());
+            } catch (Exception e) {
+                return false;
+            }
+            currentX509 = parentX509;
+            parentX509 = getIssuer(currentX509);
+        }
+
+        // check root
+        try {
+            currentX509.checkValidity();
+            currentX509.verify(currentX509.getPublicKey());
+        } catch (Exception e) {
+            return false;
+        }
+
+        return true;
     }
 
     public Subject generateSubject(User user, PublicKey publicKey) {
