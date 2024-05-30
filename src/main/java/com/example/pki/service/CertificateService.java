@@ -1,19 +1,25 @@
 package com.example.pki.service;
 
 import com.example.pki.dto.CertificateDto;
-import com.example.pki.model.Issuer;
-import com.example.pki.model.Subject;
-import com.example.pki.model.User;
+import com.example.pki.dto.CertificateType;
+import com.example.pki.dto.CreateCertificateDto;
+import com.example.pki.dto.X500NameDto;
 import com.example.pki.repository.KeyStoreRepository;
 import com.example.pki.repository.PasswordRepository;
+import com.example.pki.repository.PrivateKeyRepository;
+import com.example.pki.util.DateConverter;
+import com.example.pki.util.DateRange;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.springframework.stereotype.Service;
 
@@ -29,18 +35,19 @@ import java.util.*;
 public class CertificateService {
     private final KeyStoreRepository keyStoreRepository;
     private final PasswordRepository passwordRepository;
+    private final PrivateKeyRepository privateKeyRepository;
 
-    public CertificateService(KeyStoreRepository keyStoreRepository, PasswordRepository passwordRepository) {
+    public CertificateService(KeyStoreRepository keyStoreRepository, PasswordRepository passwordRepository,
+                              PrivateKeyRepository privateKeyRepository) {
         this.keyStoreRepository = keyStoreRepository;
-
-        String[] splitKeyStorePath = KeyStoreRepository.keyStoreFileName.split("/");
-        String keyStoreName = splitKeyStorePath[splitKeyStorePath.length - 1].split("\\.")[0];
         keyStoreRepository
                 .readKeyStore(
-                        KeyStoreRepository.keyStoreFileName,
-                        passwordRepository.getPassword(keyStoreName).toCharArray()
+                        KeyStoreRepository.keyStoreFilePath,
+                        passwordRepository.getPassword(KeyStoreRepository.keyStoreName).toCharArray()
                 );
+
         this.passwordRepository = passwordRepository;
+        this.privateKeyRepository = privateKeyRepository;
     }
 
     public X509Certificate getIssuer(X509Certificate certificate) {
@@ -100,7 +107,7 @@ public class CertificateService {
         if (keyUsages == null)
             return true;
 
-        return certificate.getBasicConstraints() == -1 || !certificate.getKeyUsage()[5];
+        return !certificate.getKeyUsage()[5];
     }
 
     private CertificateDto formCertificateTree(X509Certificate rootCertificate) throws CertificateEncodingException {
@@ -134,17 +141,17 @@ public class CertificateService {
         if (randomCertificate.isEmpty())
             return null;
 
-        // TODO: Check if root is null
-
         X509Certificate rootCertificate = getRoot(randomCertificate.get());
-        assert rootCertificate != null;
+        if (rootCertificate == null)
+            throw new RuntimeException("Root certificate not found.");
+
         return formCertificateTree(rootCertificate);
     }
 
     public boolean isCertValid(String alias) {
         X509Certificate currentX509 =
                 (X509Certificate) keyStoreRepository.readCertificate(
-                        KeyStoreRepository.keyStoreFileName,
+                        KeyStoreRepository.keyStoreFilePath,
                         passwordRepository.getPassword(KeyStoreRepository.keyStoreName),
                         alias
                 );
@@ -174,153 +181,183 @@ public class CertificateService {
         return true;
     }
 
-    public Subject generateSubject(User user, PublicKey publicKey) {
+    private X509Certificate getX509CertificateFromAlias (String alias) {
+        Certificate certificate =
+                keyStoreRepository
+                        .readCertificate(
+                                KeyStoreRepository.keyStoreFilePath,
+                                passwordRepository.getPassword(KeyStoreRepository.keyStoreName),
+                                alias
+                        );
+        if (!(certificate instanceof X509Certificate x509Certificate))
+            throw new RuntimeException("Unknown certificate.");
+
+        return x509Certificate;
+    }
+
+    public static X500Name generateX500Name(X500NameDto x500NameDto) {
         X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
-        builder.addRDN(BCStyle.CN, user.getCommonName());
-        builder.addRDN(BCStyle.SURNAME, user.getSurname());
-        builder.addRDN(BCStyle.GIVENNAME, user.getGivenName());
-        builder.addRDN(BCStyle.O, user.getOrganisation());
-        builder.addRDN(BCStyle.OU, user.getOrganisationalUnit());
-        builder.addRDN(BCStyle.C, user.getCountry());
-        builder.addRDN(BCStyle.E, user.getEmail());
-        builder.addRDN(BCStyle.UID, user.getId().toString());
-        return new Subject(publicKey, builder.build());
+        builder.addRDN(BCStyle.E, x500NameDto.getEmail());
+        builder.addRDN(BCStyle.CN, x500NameDto.getCommonName());
+        builder.addRDN(BCStyle.OU, x500NameDto.getOrganisationalUnit());
+        builder.addRDN(BCStyle.O, x500NameDto.getOrganisation());
+        builder.addRDN(BCStyle.L, x500NameDto.getLocation());
+        builder.addRDN(BCStyle.ST, x500NameDto.getState());
+        builder.addRDN(BCStyle.C, x500NameDto.getCountry());
+        return builder.build();
     }
 
-    private KeyPair generateKeyPair() {
-        try {
-            KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-            SecureRandom random = SecureRandom.getInstance("SHA1PRNG", "SUN");
-            keyGen.initialize(2048, random);
-            return keyGen.generateKeyPair();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+    private DateRange getNewCertificateDateRange(X509Certificate certificateAuthority) {
+        long startTimestamp = DateConverter.convertToUnixTime(certificateAuthority.getNotBefore());
+        long endTimestamp = DateConverter.convertToUnixTime(certificateAuthority.getNotAfter());
+        long midTimestamp = startTimestamp + (endTimestamp - startTimestamp) / 2;
+
+        long currentTimestamp = DateConverter.getCurrentUnixTime();
+
+        if (currentTimestamp >= startTimestamp && currentTimestamp <= midTimestamp)
+            return new DateRange(new Date(startTimestamp * 1000), new Date(midTimestamp * 1000));
+        else
+            return new DateRange(new Date((midTimestamp + 1) * 1000), new Date(endTimestamp * 1000));
     }
 
-    public static X509Certificate generateX509Certificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber) {
-        try {
-            JcaContentSignerBuilder builder =
-                    new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider("BC");
-            ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
+    private KeyPair generateCertificateKeyPair(String certificateAlias, CertificateType certificateType)
+            throws NoSuchAlgorithmException, NoSuchProviderException {
+        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+        SecureRandom random = SecureRandom.getInstance("SHA1PRNG", "SUN");
+        keyGen.initialize(4096, random);
 
-            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(
-                    issuer.getX500Name(),
-                    new BigInteger(serialNumber),
-                    startDate,
-                    endDate,
-                    subject.getX500Name(),
-                    subject.getPublicKey()
+        KeyPair keyPair = keyGen.generateKeyPair();
+        if (certificateType == CertificateType.Intermediate)
+            this.privateKeyRepository.writePrivateKey(keyPair.getPrivate(), certificateAlias);
+
+        return keyGen.generateKeyPair();
+    }
+
+    private X509v3CertificateBuilder getCertificateBuilder(
+            CertificateType certificateType,
+            String serialNumber,
+            X509Certificate certificateAuthority,
+            X500Name issuerX500Name,
+            X500NameDto subjectDto
+    ) throws NoSuchAlgorithmException, NoSuchProviderException {
+        X500Name subjectX500Name = generateX500Name(subjectDto);
+
+        DateRange validityDateRange = getNewCertificateDateRange(certificateAuthority);
+
+        KeyPair subjectKeys =
+                generateCertificateKeyPair(
+                        issuerX500Name
+                                .getRDNs(BCStyle.E)[0]
+                                .getFirst()
+                                .getValue()
+                                .toString() + "|" + serialNumber,
+                        certificateType
+                );
+
+        return new JcaX509v3CertificateBuilder(
+                issuerX500Name,
+                new BigInteger(serialNumber, 16),
+                validityDateRange.getStartDate(),
+                validityDateRange.getEndDate(),
+                subjectX500Name,
+                subjectKeys.getPublic()
+        );
+
+        // TODO: Send private key back to the subject if the generated certificate is EE
+
+    }
+
+    private X509Certificate signAndBuildCertificate(X509v3CertificateBuilder certificateBuilder,
+                                                    ContentSigner contentSigner)
+            throws CertificateException {
+        X509CertificateHolder certHolder = certificateBuilder.build(contentSigner);
+
+        JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter().setProvider("BC");
+
+        return certConverter.getCertificate(certHolder);
+    }
+
+    private ContentSigner getContentSigner(String issuerPrivateKeyAlias) throws OperatorCreationException {
+        PrivateKey issuerPrivateKey = this.privateKeyRepository.getPrivateKey(issuerPrivateKeyAlias);
+
+        JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider("BC");
+        return builder.build(issuerPrivateKey);
+    }
+
+    public X509Certificate generateX509HttpsCertificate(CreateCertificateDto certificateDto)
+            throws CertIOException, OperatorCreationException, CertificateException, NoSuchAlgorithmException,
+            NoSuchProviderException {
+        if (!isCertValid(certificateDto.caAlias()))
+            throw new RuntimeException(
+                    "Certificate authority is not valid. Unable to create new certificate with it's signature."
             );
-            X509CertificateHolder certHolder = certGen.build(contentSigner);
 
-            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter().setProvider("BC");
+        X509Certificate certificateAuthority = getX509CertificateFromAlias(certificateDto.caAlias());
 
-            return certConverter.getCertificate(certHolder);
-        } catch (Exception e) {
-            e.printStackTrace();
+        X500Name issuerX500Name = new JcaX509CertificateHolder(certificateAuthority).getSubject();
+
+        String serialNumber = Long.toHexString(DateConverter.getCurrentUnixTimeMillis());
+
+        X509v3CertificateBuilder certGen =
+                getCertificateBuilder(
+                        certificateDto.certificateType(),
+                        serialNumber,
+                        certificateAuthority,
+                        issuerX500Name,
+                        certificateDto.subject()
+                );
+
+        switch (certificateDto.certificateType()) {
+            case CertificateType.HTTPS:
+                // Key Usage
+                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                        new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature
+                                | org.bouncycastle.asn1.x509.KeyUsage.keyEncipherment));
+
+                // Extended Key Usage extension
+                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.extendedKeyUsage, true,
+                        new org.bouncycastle.asn1.x509.ExtendedKeyUsage(
+                                new org.bouncycastle.asn1.x509.KeyPurposeId[]{
+                                        org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth
+                                }
+                        )
+                );
+
+                // Subject Alternative Name
+                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.subjectAlternativeName, false,
+                        new org.bouncycastle.asn1.x509.GeneralNames(
+                                new org.bouncycastle.asn1.x509.GeneralName(
+                                        org.bouncycastle.asn1.x509.GeneralName.dNSName, certificateDto.domain()
+                                )
+                        )
+                );
+                break;
+            case CertificateType.DigitalSigning:
+                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                        new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature));
+                break;
+            case CertificateType.Intermediate:
+                // intermediate certificate
+                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
+                        new org.bouncycastle.asn1.x509.BasicConstraints(-1));
+
+                // Key Usage extension for keyCertSign
+                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                        new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.keyCertSign));
+                break;
         }
-        return null;
-    }
 
-    public static X509Certificate generateX509HTTPSCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber, String domain) {
-        try {
-            JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
-            builder = builder.setProvider("BC");
-            ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
-            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
-                    new BigInteger(serialNumber),
-                    startDate,
-                    endDate,
-                    subject.getX500Name(),
-                    subject.getPublicKey());
+        X509Certificate certificate = signAndBuildCertificate(certGen, getContentSigner(certificateDto.caAlias()));
+        keyStoreRepository
+                .writeCertificate(
+                        issuerX500Name.getRDNs(BCStyle.E)[0].getFirst().getValue().toString() + "|" + serialNumber,
+                        certificate
+                );
+        keyStoreRepository.writeKeyStore(
+                KeyStoreRepository.keyStoreFilePath,
+                passwordRepository.getPassword(KeyStoreRepository.keyStoreName).toCharArray()
+        );
 
-            // Subject Alternative Name
-            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.subjectAlternativeName, false,
-                new org.bouncycastle.asn1.x509.GeneralNames(
-                        new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.dNSName, domain)));
-
-            // Key Usage
-            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
-                    new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature
-                            | org.bouncycastle.asn1.x509.KeyUsage.keyEncipherment));
-
-            // Extended Key Usage extension
-            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.extendedKeyUsage, true,
-                    new org.bouncycastle.asn1.x509.ExtendedKeyUsage(
-                            new org.bouncycastle.asn1.x509.KeyPurposeId[]{org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth}));
-
-            // end entity certificate
-            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
-                    new org.bouncycastle.asn1.x509.BasicConstraints(0));
-
-            X509CertificateHolder certHolder = certGen.build(contentSigner);
-            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
-            certConverter = certConverter.setProvider("BC");
-            return certConverter.getCertificate(certHolder);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    public static X509Certificate generateX509SigningCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber) {
-        try {
-            JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
-            builder = builder.setProvider("BC");
-            ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
-            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
-                    new BigInteger(serialNumber),
-                    startDate,
-                    endDate,
-                    subject.getX500Name(),
-                    subject.getPublicKey());
-
-            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
-                new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature));
-
-            // end entity certificate
-            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
-                    new org.bouncycastle.asn1.x509.BasicConstraints(0));
-
-            X509CertificateHolder certHolder = certGen.build(contentSigner);
-            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
-            certConverter = certConverter.setProvider("BC");
-            return certConverter.getCertificate(certHolder);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    public static X509Certificate generateX509IntermediateCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber) {
-        try {
-            JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
-            builder = builder.setProvider("BC");
-            ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
-            X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
-                    new BigInteger(serialNumber),
-                    startDate,
-                    endDate,
-                    subject.getX500Name(),
-                    subject.getPublicKey());
-
-            // intermediate certificate
-            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
-                new org.bouncycastle.asn1.x509.BasicConstraints(-1));
-
-            // Key Usage extension for keyCertSign
-            certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
-                    new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.keyCertSign));
-
-            X509CertificateHolder certHolder = certGen.build(contentSigner);
-            JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
-            certConverter = certConverter.setProvider("BC");
-            return certConverter.getCertificate(certHolder);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+        return certificate;
     }
 }
