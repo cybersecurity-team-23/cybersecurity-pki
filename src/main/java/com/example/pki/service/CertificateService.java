@@ -1,9 +1,6 @@
 package com.example.pki.service;
 
-import com.example.pki.dto.CertificateDto;
-import com.example.pki.dto.CertificateType;
-import com.example.pki.dto.CreateCertificateDto;
-import com.example.pki.dto.X500NameDto;
+import com.example.pki.dto.*;
 import com.example.pki.repository.KeyStoreRepository;
 import com.example.pki.repository.PasswordRepository;
 import com.example.pki.repository.PrivateKeyRepository;
@@ -359,5 +356,44 @@ public class CertificateService {
         );
 
         return certificate;
+    }
+
+    private String getSerialNumberFromCertificate(X509Certificate certificate) {
+        return certificate.getSerialNumber().toString(16);
+    }
+
+    private String getAliasFromCertificate(X509Certificate certificate) throws CertificateEncodingException {
+        return
+                new JcaX509CertificateHolder(certificate)
+                        .getIssuer()
+                        .getRDNs(BCStyle.E)[0]
+                        .getFirst()
+                        .getValue()
+                        .toString() + "|" + getSerialNumberFromCertificate(certificate);
+    }
+
+    public void deleteCertificate(String alias) throws CertificateEncodingException {
+        X509Certificate certificate = getX509CertificateFromAlias(alias);
+        if (isRoot(certificate)) {
+            throw new RuntimeException("Root certificate cannot be deleted.");
+        }
+
+        Set<X509Certificate> children = getCertificatesSignedBy(certificate);
+        for (X509Certificate childCertificate : children) deleteCertificate(getAliasFromCertificate(childCertificate));
+
+        try {
+            keyStoreRepository.deleteEntry(alias);
+        } catch (KeyStoreException e) {
+            e.printStackTrace();
+        }
+
+        keyStoreRepository.writeKeyStore(
+                KeyStoreRepository.keyStoreFilePath,
+                passwordRepository.getPassword(KeyStoreRepository.keyStoreName).toCharArray()
+        );
+
+        if (!isEndEntity(certificate)) {
+            privateKeyRepository.deletePrivateKey(alias);
+        }
     }
 }
