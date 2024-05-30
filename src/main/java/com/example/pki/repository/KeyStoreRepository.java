@@ -14,7 +14,8 @@ import java.util.Set;
 @Repository
 public class KeyStoreRepository {
     private KeyStore keyStore;
-    public static final String keyStoreFileName = "src/main/resources/keystore/keystore.jks";
+    public static final String keyStoreDirectoryPath = "src/main/resources/keystore";
+    public static final String keyStoreFilePath = keyStoreDirectoryPath + "/keystore.jks";
     public static final String keyStoreName = "keystore";
 
     public KeyStoreRepository() {
@@ -52,6 +53,7 @@ public class KeyStoreRepository {
             KeyStore ks = KeyStore.getInstance("JKS", "SUN");
             BufferedInputStream in = new BufferedInputStream(new FileInputStream(keyStoreFile));
             ks.load(in, keyStorePassword.toCharArray());
+            in.close();
             if(ks.isCertificateEntry(alias)) {
                 return ks.getCertificate(alias);
             }
@@ -75,7 +77,7 @@ public class KeyStoreRepository {
         Set<X509Certificate> children = certificateService.getCertificatesSignedBy(cert);
         try {
             keyStore.deleteEntry(alias);
-            privateKeyRepository.deleteKey(alias);
+            privateKeyRepository.deletePrivateKey(alias);
         } catch (KeyStoreException e) {
             e.printStackTrace();
         }

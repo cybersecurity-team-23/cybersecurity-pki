@@ -1,19 +1,21 @@
 package com.example.pki.dto;
 
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x500.style.IETFUtils;
 
+@NoArgsConstructor
 @Getter
 public class X500NameDto {
-    private final String email;
-    private final String commonName;
-    private final String organisationalUnit;
-    private final String organisation;
-    private final String location;
-    private final String state;
-    private final String country;
+    private String email;
+    private String commonName;
+    private String organisationalUnit;
+    private String organisation;
+    private String location;
+    private String state;
+    private String country;
 
     public X500NameDto(X500Name x500Name) {
         email = IETFUtils.valueToString(x500Name.getRDNs(BCStyle.E)[0].getFirst().getValue());
