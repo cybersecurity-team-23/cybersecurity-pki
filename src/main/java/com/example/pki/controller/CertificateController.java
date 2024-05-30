@@ -58,13 +58,13 @@ public class CertificateController {
         return new ResponseEntity<>(certificateDto, HttpStatus.CREATED);
     }
 
-    // TODO: Rebonk this
-
-//    @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-//    public ResponseEntity<Void> deleteCertificate() {
-//        String keyStorePass = passwordRepository.getPassword(KeyStoreRepository.keyStoreName);
-//        X509Certificate certificate = (X509Certificate) keyStoreRepository.readCertificate(KeyStoreRepository.keyStoreFileName, keyStorePass, certificateAliasDTO.getAlias());
-//        keyStoreRepository.deleteCertificate(certificate, privateKeyRepository, certificateService);
-//        return new ResponseEntity<>(HttpStatus.OK);
-//    }
+    @DeleteMapping()
+    public ResponseEntity<Void> deleteCertificate(@RequestParam String alias) {
+        try {
+            certificateService.deleteCertificate(alias);
+        } catch (CertificateEncodingException e) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
 }
