@@ -49,13 +49,14 @@ public class CertificateController {
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CreateCertificateDto> createCertificate(@RequestBody CreateCertificateDto certificateDto) {
+        CreateCertificateDto createCertificateDto;
         try {
-            certificateService.generateX509HttpsCertificate(certificateDto);
+            createCertificateDto = certificateService.generateX509HttpsCertificate(certificateDto);
         } catch (CertIOException | OperatorCreationException | CertificateException | NoSuchAlgorithmException |
                  NoSuchProviderException e) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
-        return new ResponseEntity<>(certificateDto, HttpStatus.CREATED);
+        return new ResponseEntity<>(createCertificateDto, HttpStatus.CREATED);
     }
 
     // TODO: Rebonk this

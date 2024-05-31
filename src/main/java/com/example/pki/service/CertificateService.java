@@ -73,8 +73,6 @@ public class CertificateService {
     }
 
     private X509Certificate getRoot(X509Certificate certificate) {
-        certificate.getIssuerX500Principal().getName();
-        certificate.getSerialNumber();
         X509Certificate issuerCertificate = getIssuer(certificate);
         if (issuerCertificate == null)
             return null;
@@ -281,7 +279,7 @@ public class CertificateService {
         return builder.build(issuerPrivateKey);
     }
 
-    public X509Certificate generateX509HttpsCertificate(CreateCertificateDto certificateDto)
+    public CreateCertificateDto generateX509HttpsCertificate(CreateCertificateDto certificateDto)
             throws CertIOException, OperatorCreationException, CertificateException, NoSuchAlgorithmException,
             NoSuchProviderException {
         if (!isCertValid(certificateDto.caAlias()))
@@ -291,7 +289,8 @@ public class CertificateService {
 
         X509Certificate certificateAuthority = getX509CertificateFromAlias(certificateDto.caAlias());
 
-        X500Name issuerX500Name = new JcaX509CertificateHolder(certificateAuthority).getSubject();
+        JcaX509CertificateHolder caHolder = new JcaX509CertificateHolder(certificateAuthority);
+        X500Name issuerX500Name = caHolder.getSubject();
 
         String serialNumber = Long.toHexString(DateConverter.getCurrentUnixTimeMillis());
 
@@ -355,6 +354,16 @@ public class CertificateService {
                 passwordRepository.getPassword(KeyStoreRepository.keyStoreName).toCharArray()
         );
 
-        return certificate;
+        return new CreateCertificateDto(
+                certificateDto.certificateType(),
+                caHolder
+                        .getIssuer()
+                        .getRDNs(BCStyle.E)[0]
+                        .getFirst()
+                        .getValue()
+                        .toString() + "|" + certificateAuthority.getSerialNumber().toString(16),
+                certificateDto.subject(),
+                certificateDto.domain()
+        );
     }
 }
