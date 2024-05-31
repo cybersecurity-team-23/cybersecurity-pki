@@ -230,7 +230,7 @@ public class CertificateService {
         if (certificateType == CertificateType.Intermediate)
             this.privateKeyRepository.writePrivateKey(keyPair.getPrivate(), certificateAlias);
 
-        return keyGen.generateKeyPair();
+        return keyPair;
     }
 
     private X509v3CertificateBuilder getCertificateBuilder(
@@ -262,9 +262,6 @@ public class CertificateService {
                 subjectX500Name,
                 subjectKeys.getPublic()
         );
-
-        // TODO: Send private key back to the subject if the generated certificate is EE
-
     }
 
     private X509Certificate signAndBuildCertificate(X509v3CertificateBuilder certificateBuilder,
