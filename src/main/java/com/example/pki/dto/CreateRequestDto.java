@@ -5,13 +5,12 @@ import lombok.Getter;
 
 @AllArgsConstructor
 @Getter
-public class CreateRequestDTO {
-    private String commonName;
-    private String surname;
-    private String givenName;
-    private String organisation;
-    private String organisationalUnit;
-    private String country;
+public class CreateRequestDto {
     private String email;
-    private Long uid;
+    private String commonName;
+    private String organisationalUnit;
+    private String organisation;
+    private String location;
+    private String state;
+    private String country;
 }

@@ -10,15 +10,14 @@ import lombok.Setter;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestDTO {
+public class RequestDto {
     private Long id;
-    private String commonName;
-    private String surname;
-    private String givenName;
-    private String organisation;
-    private String organisationalUnit;
-    private String country;
     private String email;
-    private Long uid;
+    private String commonName;
+    private String organisationalUnit;
+    private String organisation;
+    private String location;
+    private String state;
+    private String country;
     private RequestStatus status;
 }

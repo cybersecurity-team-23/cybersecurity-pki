@@ -1,7 +1,7 @@
 package com.example.pki.controller;
 
 import com.example.pki.dto.CertificateDto;
-import com.example.pki.dto.CertificateValidityDTO;
+import com.example.pki.dto.CertificateValidityDto;
 import com.example.pki.dto.CreateCertificateDto;
 import com.example.pki.service.CertificateService;
 import org.bouncycastle.cert.CertIOException;
@@ -40,22 +40,23 @@ public class CertificateController {
     }
 
     @GetMapping(path="/valid", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<CertificateValidityDTO> isCertificateValid(
+    public ResponseEntity<CertificateValidityDto> isCertificateValid(
             @RequestParam String alias
     ) {
         boolean isValid = certificateService.isCertValid(alias);
-        return new ResponseEntity<>(new CertificateValidityDTO(isValid), HttpStatus.OK);
+        return new ResponseEntity<>(new CertificateValidityDto(isValid), HttpStatus.OK);
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CreateCertificateDto> createCertificate(@RequestBody CreateCertificateDto certificateDto) {
+        CreateCertificateDto createCertificateDto;
         try {
-            certificateService.generateX509HttpsCertificate(certificateDto);
+            createCertificateDto = certificateService.generateX509HttpsCertificate(certificateDto);
         } catch (CertIOException | OperatorCreationException | CertificateException | NoSuchAlgorithmException |
                  NoSuchProviderException e) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
-        return new ResponseEntity<>(certificateDto, HttpStatus.CREATED);
+        return new ResponseEntity<>(createCertificateDto, HttpStatus.CREATED);
     }
 
     @DeleteMapping()
