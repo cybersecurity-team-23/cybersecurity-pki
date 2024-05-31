@@ -15,6 +15,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.security.PrivateKey;
+import java.util.ArrayList;
+import java.util.List;
 
 @Repository
 public class PrivateKeyRepository {
@@ -107,10 +109,32 @@ public class PrivateKeyRepository {
         writePrivateKeyAlias(alias, privateKeyName);
     }
 
+    private void deletePrivateKeyAlias(String alias) {
+        try {
+            CSVReader reader = new CSVReader(new FileReader(privateKeysAliasesFilePath));
+
+            List<String[]> entries = new ArrayList<>();
+            String[] entry;
+            while (true) {
+                entry = reader.readNext();
+                if (entry == null) {
+                    reader.close();
+                    break;
+                } else if (!entry[0].equals(alias)) entries.add(entry);
+            }
+
+            CSVWriter writer = new CSVWriter(new FileWriter(privateKeysAliasesFilePath));
+            writer.writeAll(entries);
+            writer.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public void deletePrivateKey(String alias) {
         String privateKeyName = getPrivateKeyNameFromAlias(alias);
         String filePath = privateKeysDirectoryPath + "/" + privateKeyName;
         File file = new File(filePath);
-        if (file.exists()) file.delete();
+        if (file.exists() && file.delete()) deletePrivateKeyAlias(alias);
     }
 }
