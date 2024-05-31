@@ -28,45 +28,42 @@ public class RequestService {
     }
 
     public Request create(
-            String commonName,
-            String surname,
-            String givenName,
-            String organisation,
-            String organisationalUnit,
-            String country,
             String email,
-            Long uid
+            String commonName,
+            String organisationalUnit,
+            String organisation,
+            String location,
+            String state,
+            String country
     ) {
 
         Request request = new Request(
-                commonName,
-                surname,
-                givenName,
-                organisation,
-                organisationalUnit,
-                country,
                 email,
-                uid,
+                commonName,
+                organisationalUnit,
+                organisation,
+                location,
+                state,
+                country,
                 RequestStatus.PENDING
         );
 
         return requestRepository.save(request);
     }
 
-    // TODO: Actually implement the logic
     public Request approve(Long id) {
-            int updatedCount = requestRepository.approveRequest(id);
-            if (updatedCount == 0) {
-                throw new RuntimeException("Request not found");
-            }
+        int updatedCount = requestRepository.approveRequest(id);
+        if (updatedCount == 0) {
+            throw new RuntimeException("Request not found");
+        }
 
-            Optional<Request> request = requestRepository.findById(id);
+        Optional<Request> request = requestRepository.findById(id);
 
-            if (request.isEmpty()) {
-                throw new RuntimeException("Request not found");
-            }
+        if (request.isEmpty()) {
+            throw new RuntimeException("Request not found");
+        }
 
-            return request.get();
+        return request.get();
     }
 
     @Transactional

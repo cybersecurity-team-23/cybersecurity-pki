@@ -5,6 +5,6 @@ import lombok.Getter;
 
 @AllArgsConstructor
 @Getter
-public class CertificateValidityDTO {
+public class CertificateValidityDto {
     private boolean isValid;
 }
