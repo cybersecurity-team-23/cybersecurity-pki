@@ -160,7 +160,10 @@ public class CertificateService {
                         alias
                 );
         if (currentX509 == null)
-            return false;
+            throw new HttpTransferException(
+                    HttpStatus.NOT_FOUND,
+                    "The certificate to be validated has not been found."
+            );
 
         X509Certificate parentX509 = getIssuer(currentX509);
         while (!isRoot(currentX509)) {
