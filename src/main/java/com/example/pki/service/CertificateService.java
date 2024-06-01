@@ -1,6 +1,7 @@
 package com.example.pki.service;
 
 import com.example.pki.dto.*;
+import com.example.pki.exception.HttpTransferException;
 import com.example.pki.repository.KeyStoreRepository;
 import com.example.pki.repository.PasswordRepository;
 import com.example.pki.repository.PrivateKeyRepository;
@@ -18,6 +19,7 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigInteger;
@@ -105,8 +107,16 @@ public class CertificateService {
         return !certificate.getKeyUsage()[5];
     }
 
-    private CertificateDto formCertificateTree(X509Certificate rootCertificate) throws CertificateEncodingException {
-        JcaX509CertificateHolder jcaX509CertificateHolder = new JcaX509CertificateHolder(rootCertificate);
+    private CertificateDto formCertificateTree(X509Certificate rootCertificate) {
+        JcaX509CertificateHolder jcaX509CertificateHolder;
+        try {
+            jcaX509CertificateHolder = new JcaX509CertificateHolder(rootCertificate);
+        } catch (CertificateEncodingException e) {
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Unable to get certificate tree. One of the certificates in the tree could not be accessed."
+            );
+        }
         CertificateDto certificateTree =
                 new CertificateDto(
                         rootCertificate,
@@ -125,7 +135,7 @@ public class CertificateService {
         return certificateTree;
     }
 
-    public CertificateDto getCertificateTree() throws CertificateEncodingException {
+    public CertificateDto getCertificateTree() {
         Optional<X509Certificate> randomCertificate =
                 keyStoreRepository
                         .getAllCertificates()
@@ -138,7 +148,7 @@ public class CertificateService {
 
         X509Certificate rootCertificate = getRoot(randomCertificate.get());
         if (rootCertificate == null)
-            throw new RuntimeException("Root certificate not found.");
+            throw new HttpTransferException(HttpStatus.NOT_FOUND, "Root certificate not found.");
 
         return formCertificateTree(rootCertificate);
     }
@@ -146,7 +156,6 @@ public class CertificateService {
     public boolean isCertValid(String alias) {
         X509Certificate currentX509 =
                 (X509Certificate) keyStoreRepository.readCertificate(
-                        KeyStoreRepository.keyStoreFilePath,
                         passwordRepository.getPassword(KeyStoreRepository.keyStoreName),
                         alias
                 );
@@ -180,12 +189,11 @@ public class CertificateService {
         Certificate certificate =
                 keyStoreRepository
                         .readCertificate(
-                                KeyStoreRepository.keyStoreFilePath,
                                 passwordRepository.getPassword(KeyStoreRepository.keyStoreName),
                                 alias
                         );
         if (!(certificate instanceof X509Certificate x509Certificate))
-            throw new RuntimeException("Unknown certificate.");
+            throw new HttpTransferException(HttpStatus.NOT_FOUND, "Certificate could not be found.");
 
         return x509Certificate;
     }
@@ -215,10 +223,18 @@ public class CertificateService {
             return new DateRange(new Date((midTimestamp + 1) * 1000), new Date(endTimestamp * 1000));
     }
 
-    private KeyPair generateCertificateKeyPair(String certificateAlias, CertificateType certificateType)
-            throws NoSuchAlgorithmException, NoSuchProviderException {
-        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-        SecureRandom random = SecureRandom.getInstance("SHA1PRNG", "SUN");
+    private KeyPair generateCertificateKeyPair(String certificateAlias, CertificateType certificateType) {
+        KeyPairGenerator keyGen;
+        SecureRandom random;
+        try {
+            keyGen = KeyPairGenerator.getInstance("RSA");
+            random = SecureRandom.getInstance("SHA1PRNG", "SUN");
+        } catch (NoSuchAlgorithmException | NoSuchProviderException e) {
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not generate a key pair for the certificate."
+            );
+        }
         keyGen.initialize(4096, random);
 
         KeyPair keyPair = keyGen.generateKeyPair();
@@ -234,7 +250,7 @@ public class CertificateService {
             X509Certificate certificateAuthority,
             X500Name issuerX500Name,
             X500NameDto subjectDto
-    ) throws NoSuchAlgorithmException, NoSuchProviderException {
+    ) {
         X500Name subjectX500Name = generateX500Name(subjectDto);
 
         DateRange validityDateRange = getNewCertificateDateRange(certificateAuthority);
@@ -260,33 +276,47 @@ public class CertificateService {
     }
 
     private X509Certificate signAndBuildCertificate(X509v3CertificateBuilder certificateBuilder,
-                                                    ContentSigner contentSigner)
-            throws CertificateException {
+                                                    ContentSigner contentSigner) {
         X509CertificateHolder certHolder = certificateBuilder.build(contentSigner);
 
         JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter().setProvider("BC");
 
-        return certConverter.getCertificate(certHolder);
+        try {
+            return certConverter.getCertificate(certHolder);
+        } catch (CertificateException e) {
+            throw new HttpTransferException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not create certificate.");
+        }
     }
 
-    private ContentSigner getContentSigner(String issuerPrivateKeyAlias) throws OperatorCreationException {
+    private ContentSigner getContentSigner(String issuerPrivateKeyAlias) {
         PrivateKey issuerPrivateKey = this.privateKeyRepository.getPrivateKey(issuerPrivateKeyAlias);
 
         JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider("BC");
-        return builder.build(issuerPrivateKey);
+        try {
+            return builder.build(issuerPrivateKey);
+        } catch (OperatorCreationException e) {
+            throw new HttpTransferException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not create certificate.");
+        }
     }
 
-    public CreateCertificateDto generateX509HttpsCertificate(CreateCertificateDto certificateDto)
-            throws CertIOException, OperatorCreationException, CertificateException, NoSuchAlgorithmException,
-            NoSuchProviderException {
+    public CreateCertificateDto generateX509HttpsCertificate(CreateCertificateDto certificateDto) {
         if (!isCertValid(certificateDto.caAlias()))
-            throw new RuntimeException(
+            throw new HttpTransferException(
+                    HttpStatus.BAD_REQUEST,
                     "Certificate authority is not valid. Unable to create new certificate with it's signature."
             );
 
         X509Certificate certificateAuthority = getX509CertificateFromAlias(certificateDto.caAlias());
 
-        JcaX509CertificateHolder caHolder = new JcaX509CertificateHolder(certificateAuthority);
+        JcaX509CertificateHolder caHolder;
+        try {
+            caHolder = new JcaX509CertificateHolder(certificateAuthority);
+        } catch (CertificateEncodingException e) {
+            throw new HttpTransferException(
+                    HttpStatus.BAD_REQUEST,
+                    "Unable to create certificate. The certificate authority could not be accessed."
+            );
+        }
         X500Name issuerX500Name = caHolder.getSubject();
 
         String serialNumber = Long.toHexString(DateConverter.getCurrentUnixTimeMillis());
@@ -300,44 +330,53 @@ public class CertificateService {
                         certificateDto.subject()
                 );
 
-        switch (certificateDto.certificateType()) {
-            case CertificateType.HTTPS:
-                // Key Usage
-                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
-                        new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature
-                                | org.bouncycastle.asn1.x509.KeyUsage.keyEncipherment));
+        try {
+            switch (certificateDto.certificateType()) {
+                case CertificateType.HTTPS:
+                    // Key Usage
+                    certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                            new org.bouncycastle.asn1.x509.KeyUsage(
+                                    org.bouncycastle.asn1.x509.KeyUsage.digitalSignature
+                                    | org.bouncycastle.asn1.x509.KeyUsage.keyEncipherment
+                            )
+                    );
 
-                // Extended Key Usage extension
-                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.extendedKeyUsage, true,
-                        new org.bouncycastle.asn1.x509.ExtendedKeyUsage(
-                                new org.bouncycastle.asn1.x509.KeyPurposeId[]{
-                                        org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth
-                                }
-                        )
-                );
+                    // Extended Key Usage extension
+                    certGen.addExtension(org.bouncycastle.asn1.x509.Extension.extendedKeyUsage, true,
+                            new org.bouncycastle.asn1.x509.ExtendedKeyUsage(
+                                    new org.bouncycastle.asn1.x509.KeyPurposeId[]{
+                                            org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth
+                                    }
+                            )
+                    );
 
-                // Subject Alternative Name
-                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.subjectAlternativeName, false,
-                        new org.bouncycastle.asn1.x509.GeneralNames(
-                                new org.bouncycastle.asn1.x509.GeneralName(
-                                        org.bouncycastle.asn1.x509.GeneralName.dNSName, certificateDto.domain()
-                                )
-                        )
-                );
-                break;
-            case CertificateType.DigitalSigning:
-                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
-                        new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.digitalSignature));
-                break;
-            case CertificateType.Intermediate:
-                // intermediate certificate
-                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
-                        new org.bouncycastle.asn1.x509.BasicConstraints(-1));
+                    // Subject Alternative Name
+                    certGen.addExtension(org.bouncycastle.asn1.x509.Extension.subjectAlternativeName, false,
+                            new org.bouncycastle.asn1.x509.GeneralNames(
+                                    new org.bouncycastle.asn1.x509.GeneralName(
+                                            org.bouncycastle.asn1.x509.GeneralName.dNSName, certificateDto.domain()
+                                    )
+                            )
+                    );
+                    break;
+                case CertificateType.DigitalSigning:
+                    certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                            new org.bouncycastle.asn1.x509.KeyUsage(
+                                    org.bouncycastle.asn1.x509.KeyUsage.digitalSignature)
+                    );
+                    break;
+                case CertificateType.Intermediate:
+                    // intermediate certificate
+                    certGen.addExtension(org.bouncycastle.asn1.x509.Extension.basicConstraints, true,
+                            new org.bouncycastle.asn1.x509.BasicConstraints(-1));
 
-                // Key Usage extension for keyCertSign
-                certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
-                        new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.keyCertSign));
-                break;
+                    // Key Usage extension for keyCertSign
+                    certGen.addExtension(org.bouncycastle.asn1.x509.Extension.keyUsage, true,
+                            new org.bouncycastle.asn1.x509.KeyUsage(org.bouncycastle.asn1.x509.KeyUsage.keyCertSign));
+                    break;
+            }
+        } catch (CertIOException e) {
+            throw new HttpTransferException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not create certificate.");
         }
 
         X509Certificate certificate = signAndBuildCertificate(certGen, getContentSigner(certificateDto.caAlias()));
@@ -368,30 +407,33 @@ public class CertificateService {
         return certificate.getSerialNumber().toString(16);
     }
 
-    private String getAliasFromCertificate(X509Certificate certificate) throws CertificateEncodingException {
-        return
-                new JcaX509CertificateHolder(certificate)
-                        .getIssuer()
-                        .getRDNs(BCStyle.E)[0]
-                        .getFirst()
-                        .getValue()
-                        .toString() + "|" + getSerialNumberFromCertificate(certificate);
+    private String getAliasFromCertificate(X509Certificate certificate) {
+        try {
+            return
+                    new JcaX509CertificateHolder(certificate)
+                            .getIssuer()
+                            .getRDNs(BCStyle.E)[0]
+                            .getFirst()
+                            .getValue()
+                            .toString() + "|" + getSerialNumberFromCertificate(certificate);
+        } catch (CertificateEncodingException e) {
+            throw new HttpTransferException(
+                    HttpStatus.BAD_REQUEST,
+                    "Could not delete certificate. One of the certificates in the chain could not be accessed."
+            );
+        }
     }
 
-    public void deleteCertificate(String alias) throws CertificateEncodingException {
+    public void deleteCertificate(String alias) {
         X509Certificate certificate = getX509CertificateFromAlias(alias);
         if (isRoot(certificate)) {
-            throw new RuntimeException("Root certificate cannot be deleted.");
+            throw new HttpTransferException(HttpStatus.BAD_REQUEST, "Root certificate cannot be deleted.");
         }
 
         Set<X509Certificate> children = getCertificatesSignedBy(certificate);
         for (X509Certificate childCertificate : children) deleteCertificate(getAliasFromCertificate(childCertificate));
 
-        try {
-            keyStoreRepository.deleteEntry(alias);
-        } catch (KeyStoreException e) {
-            e.printStackTrace();
-        }
+        keyStoreRepository.deleteEntry(alias);
 
         keyStoreRepository.writeKeyStore(
                 KeyStoreRepository.keyStoreFilePath,

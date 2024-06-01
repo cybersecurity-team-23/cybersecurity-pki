@@ -1,9 +1,11 @@
 package com.example.pki.service;
 
+import com.example.pki.exception.HttpTransferException;
 import com.example.pki.model.Request;
 import com.example.pki.model.RequestStatus;
 import com.example.pki.repository.RequestRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -21,10 +23,6 @@ public class RequestService {
 
     public List<Request> getAllUnresolved() {
         return requestRepository.findAllByStatus(RequestStatus.PENDING);
-    }
-
-    public Optional<Request> findById(Long id) {
-        return requestRepository.findById(id);
     }
 
     public Request create(
@@ -52,15 +50,21 @@ public class RequestService {
     }
 
     public Request approve(Long id) {
-        int updatedCount = requestRepository.approveRequest(id);
-        if (updatedCount == 0) {
-            throw new RuntimeException("Request not found");
+        int approvedCount = requestRepository.approveRequest(id);
+        if (approvedCount == 0) {
+            throw new HttpTransferException(
+                    HttpStatus.NOT_FOUND,
+                    "The certificate request you attempted to approve has not been found."
+            );
         }
 
         Optional<Request> request = requestRepository.findById(id);
 
         if (request.isEmpty()) {
-            throw new RuntimeException("Request not found");
+            throw new HttpTransferException(
+                    HttpStatus.NOT_FOUND,
+                    "The certificate request you attempted to approve has not been found."
+            );
         }
 
         return request.get();
@@ -68,15 +72,21 @@ public class RequestService {
 
     @Transactional
     public Request reject(Long id) {
-        int updatedCount = requestRepository.rejectRequest(id);
-        if (updatedCount == 0) {
-            throw new RuntimeException("Request not found");
+        int rejectCount = requestRepository.rejectRequest(id);
+        if (rejectCount == 0) {
+            throw new HttpTransferException(
+                    HttpStatus.NOT_FOUND,
+                    "The certificate request you attempted to reject has not been found."
+            );
         }
 
         Optional<Request> request = requestRepository.findById(id);
 
         if (request.isEmpty()) {
-            throw new RuntimeException("Request not found");
+            throw new HttpTransferException(
+                    HttpStatus.NOT_FOUND,
+                    "The certificate request you attempted to reject has not been found."
+            );
         }
 
         return request.get();

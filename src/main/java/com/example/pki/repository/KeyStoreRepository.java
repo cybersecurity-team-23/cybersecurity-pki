@@ -1,6 +1,7 @@
 package com.example.pki.repository;
 
-import com.example.pki.service.CertificateService;
+import com.example.pki.exception.HttpTransferException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 import java.io.*;
 import java.security.*;
@@ -13,7 +14,7 @@ import java.util.Set;
 
 @Repository
 public class KeyStoreRepository {
-    private KeyStore keyStore;
+    private final KeyStore keyStore;
     public static final String keyStoreDirectoryPath = "src/main/resources/keystore";
     public static final String keyStoreFilePath = keyStoreDirectoryPath + "/keystore.jks";
     public static final String keyStoreName = "keystore";
@@ -22,7 +23,10 @@ public class KeyStoreRepository {
         try {
             keyStore = KeyStore.getInstance("JKS", "SUN");
         } catch (KeyStoreException | NoSuchProviderException e) {
-            e.printStackTrace();
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Certificate store could not be accessed."
+            );
         }
     }
 
@@ -36,7 +40,10 @@ public class KeyStoreRepository {
                 keyStore.load(null, password);
             }
         } catch (NoSuchAlgorithmException | CertificateException | IOException e) {
-            e.printStackTrace();
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Certificate store could not be accessed."
+            );
         }
     }
 
@@ -44,22 +51,24 @@ public class KeyStoreRepository {
         try {
             keyStore.store(new FileOutputStream(fileName), password);
         } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
-            e.printStackTrace();
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Certificate store could not be written to."
+            );
         }
     }
 
-    public Certificate readCertificate(String keyStoreFile, String keyStorePassword, String alias) {
+    public Certificate readCertificate(String keyStorePassword, String alias) {
         try {
-            KeyStore ks = KeyStore.getInstance("JKS", "SUN");
-            BufferedInputStream in = new BufferedInputStream(new FileInputStream(keyStoreFile));
-            ks.load(in, keyStorePassword.toCharArray());
-            in.close();
-            if(ks.isCertificateEntry(alias)) {
-                return ks.getCertificate(alias);
+            readKeyStore(keyStoreFilePath, keyStorePassword.toCharArray());
+            if (keyStore.isCertificateEntry(alias)) {
+                return keyStore.getCertificate(alias);
             }
-        } catch (KeyStoreException | NoSuchProviderException | NoSuchAlgorithmException | CertificateException |
-                 IOException e) {
-            e.printStackTrace();
+        } catch (KeyStoreException e) {
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Certificate store could not be accessed."
+            );
         }
         return null;
     }
@@ -68,12 +77,22 @@ public class KeyStoreRepository {
         try {
             keyStore.setCertificateEntry(alias, cert);
         } catch (KeyStoreException e) {
-            e.printStackTrace();
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Certificate store could not be accessed."
+            );
         }
     }
 
-    public void deleteEntry(String entryAlias) throws KeyStoreException {
-        keyStore.deleteEntry(entryAlias);
+    public void deleteEntry(String entryAlias) {
+        try {
+            keyStore.deleteEntry(entryAlias);
+        } catch (KeyStoreException e) {
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Certificate store could not be accessed, or the given certificate could not be deleted."
+            );
+        }
     }
 
     public Set<Certificate> getAllCertificates() {
@@ -85,8 +104,11 @@ public class KeyStoreRepository {
                 Certificate cert = keyStore.getCertificate(alias);
                 certs.add(cert);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (KeyStoreException e) {
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Certificate store could not be accessed."
+            );
         }
         return certs;
     }
