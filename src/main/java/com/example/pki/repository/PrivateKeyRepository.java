@@ -1,19 +1,19 @@
 package com.example.pki.repository;
 
+import com.example.pki.exception.HttpTransferException;
 import com.example.pki.util.DateConverter;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
+import com.opencsv.exceptions.CsvValidationException;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.security.PrivateKey;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,8 +42,11 @@ public class PrivateKeyRepository {
                     return csvEntry[1];
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (CsvValidationException | IOException e) {
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Private key store could not be accessed."
+            );
         }
 
         return null;
@@ -73,22 +76,23 @@ public class PrivateKeyRepository {
                 pemParser.close();
                 return null;
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException e) {
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Private key store could not be accessed."
+            );
         }
-
-        return null;
     }
 
     private void writePrivateKeyAlias(String alias, String name) {
         try {
             CSVWriter csvWriter = new CSVWriter(new FileWriter(privateKeysAliasesFilePath, true));
 
-            csvWriter.writeNext(new String[] { alias, name });
+            csvWriter.writeNext(new String[]{alias, name});
 
             csvWriter.close();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new HttpTransferException(HttpStatus.INTERNAL_SERVER_ERROR, "Private key could not be stored.");
         }
     }
 
@@ -102,8 +106,8 @@ public class PrivateKeyRepository {
             pw.writeObject(key);
             pw.close();
             fw.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException e) {
+            throw new HttpTransferException(HttpStatus.INTERNAL_SERVER_ERROR, "Private key could not be stored.");
         }
 
         writePrivateKeyAlias(alias, privateKeyName);
@@ -126,8 +130,8 @@ public class PrivateKeyRepository {
             CSVWriter writer = new CSVWriter(new FileWriter(privateKeysAliasesFilePath));
             writer.writeAll(entries);
             writer.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (CsvValidationException | IOException e) {
+            throw new HttpTransferException(HttpStatus.INTERNAL_SERVER_ERROR, "Private key could not be deleted.");
         }
     }
 

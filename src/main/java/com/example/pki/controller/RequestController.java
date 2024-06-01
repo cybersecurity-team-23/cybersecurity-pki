@@ -7,17 +7,12 @@ import com.example.pki.mapper.RequestDtoMapper;
 import com.example.pki.model.Request;
 import com.example.pki.service.CertificateService;
 import com.example.pki.service.RequestService;
-import org.bouncycastle.cert.CertIOException;
-import org.bouncycastle.operator.OperatorCreationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.cert.CertificateException;
 import java.util.*;
 
 @RestController
@@ -43,19 +38,6 @@ public class RequestController {
         return new ResponseEntity<>(requests, HttpStatus.OK);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getRequestById(@PathVariable Long id) {
-        Optional<Request> request = requestService.findById(id);
-
-        if (request.isEmpty()) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-        }
-
-        Request requestResponse = request.get();
-
-        return new ResponseEntity<>(RequestDtoMapper.fromRequestToDto(requestResponse), HttpStatus.OK);
-    }
-
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CreateRequestDto> createRequest(@RequestBody CreateRequestDto dto) {
         Request request = requestService.create(
@@ -76,23 +58,12 @@ public class RequestController {
     @PutMapping("/approve/{id}")
     public ResponseEntity<RequestDto> approveRequest(@PathVariable Long id,
                                                      @RequestBody CreateCertificateDto certificateDto) {
-        try {
-            certificateService.generateX509HttpsCertificate(certificateDto);
-            Request request = requestService.approve(id);
-            return new ResponseEntity<>(RequestDtoMapper.fromRequestToDto(request), HttpStatus.OK);
-        } catch (RuntimeException | CertificateException | NoSuchAlgorithmException | OperatorCreationException |
-                 NoSuchProviderException | CertIOException e) {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
-        }
+        certificateService.generateX509HttpsCertificate(certificateDto);
+        return new ResponseEntity<>(RequestDtoMapper.fromRequestToDto(requestService.approve(id)), HttpStatus.OK);
     }
 
     @PutMapping("/reject/{id}")
     public ResponseEntity<RequestDto> rejectRequest(@PathVariable Long id) {
-        try {
-            Request request = requestService.reject(id);
-            return new ResponseEntity<>(RequestDtoMapper.fromRequestToDto(request), HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-        }
+        return new ResponseEntity<>(RequestDtoMapper.fromRequestToDto(requestService.reject(id)), HttpStatus.OK);
     }
 }
