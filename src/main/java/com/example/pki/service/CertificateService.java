@@ -24,10 +24,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigInteger;
 import java.security.*;
+import java.security.cert.*;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateEncodingException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.util.*;
 
 @Service
@@ -107,6 +105,38 @@ public class CertificateService {
         return !certificate.getKeyUsage()[5];
     }
 
+    private ArrayList<String> getCertificateExtensions(X509Certificate certificate) {
+        ArrayList<String> extensions = new ArrayList<>();
+        boolean[] keyUsages = certificate.getKeyUsage();
+        if (keyUsages != null) {
+            if (keyUsages[5])
+                extensions.add("Certificate Signing (Path Length: -1)");
+            if (keyUsages[0])
+                extensions.add("Digital Signature");
+            if (keyUsages[2])
+                extensions.add("Key Encipherment");
+        }
+
+        try {
+            List<String> extendedKeyUsages = certificate.getExtendedKeyUsage();
+            if (extendedKeyUsages != null) {
+                if (extendedKeyUsages.contains("1.3.6.1.5.5.7.3.1"))
+                    extensions.add("Server Authentication");
+            }
+        } catch (CertificateParsingException _) { }
+
+        try {
+            Collection<List<?>> subjectAlternativeNames = certificate.getSubjectAlternativeNames();
+            if (subjectAlternativeNames != null) {
+                subjectAlternativeNames.forEach(subjectAlternativeName ->
+                        extensions.add("Domain = \"" + subjectAlternativeName.get(1).toString() + "\"")
+                );
+            }
+        } catch (CertificateParsingException _) { }
+
+        return extensions;
+    }
+
     private CertificateDto formCertificateTree(X509Certificate rootCertificate) {
         JcaX509CertificateHolder jcaX509CertificateHolder;
         try {
@@ -122,6 +152,7 @@ public class CertificateService {
                         rootCertificate,
                         jcaX509CertificateHolder.getIssuer(),
                         jcaX509CertificateHolder.getSubject(),
+                        getCertificateExtensions(rootCertificate),
                         isEndEntity(rootCertificate),
                         isRoot(rootCertificate)
                 );
