@@ -7,6 +7,7 @@ import com.example.pki.repository.PasswordRepository;
 import com.example.pki.repository.PrivateKeyRepository;
 import com.example.pki.util.DateConverter;
 import com.example.pki.util.DateRange;
+import org.apache.tomcat.util.codec.binary.Base64;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -477,5 +478,69 @@ public class CertificateService {
         if (!isEndEntity(certificate)) {
             privateKeyRepository.deletePrivateKey(alias);
         }
+    }
+
+    public Collection<CertificateDistributionDto> getCertificatesForRecipient(String recipientEmail) {
+        Set<CertificateDistributionDto> certificates = new HashSet<>();
+        for (Certificate certificate : keyStoreRepository.getAllCertificates()) {
+            if (!(certificate instanceof X509Certificate x509Certificate))
+                continue;
+
+            String certificateRecipientEmail;
+            try {
+                certificateRecipientEmail =
+                        new JcaX509CertificateHolder(x509Certificate)
+                                .getSubject()
+                                .getRDNs(BCStyle.E)[0]
+                                .getFirst()
+                                .getValue()
+                                .toString();
+            } catch (CertificateEncodingException e) {
+                throw new HttpTransferException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not read a certificate.");
+            }
+            if (!certificateRecipientEmail.equals(recipientEmail))
+                continue;
+
+            String encodedCertificateBody;
+            try {
+                encodedCertificateBody = new String(Base64.encodeBase64(x509Certificate.getEncoded(), true));
+            } catch (CertificateEncodingException e) {
+                continue;
+            }
+
+            final String base64EncodedCertificate =
+                    "-----BEGIN CERTIFICATE-----\n" + encodedCertificateBody + "-----END CERTIFICATE-----";
+
+            String[] certificateAlias = getAliasFromCertificate(x509Certificate).split("\\|");
+
+            X509Certificate signerCertificate = getIssuer(x509Certificate);
+            String signerAlias = getAliasFromCertificate(signerCertificate);
+            PrivateKey signerPrivateKey = privateKeyRepository.getPrivateKey(signerAlias);
+
+            Signature signature;
+            String signedCertificate;
+            try {
+                signature = Signature.getInstance("SHA256withRSA");
+                signature.initSign(signerPrivateKey);
+                signature.update(base64EncodedCertificate.getBytes());
+                signedCertificate = new String(signature.sign());
+            } catch (SignatureException | NoSuchAlgorithmException | InvalidKeyException e) {
+                throw new HttpTransferException(HttpStatus.INTERNAL_SERVER_ERROR, "Certificate could not be signed.");
+            }
+
+            certificates
+                    .add(
+                            new CertificateDistributionDto(
+                                    certificateAlias[0],
+                                    certificateAlias[1],
+                                    base64EncodedCertificate,
+                                    signedCertificate,
+                                    "SHA256withRSA",
+                                    new String(signerCertificate.getPublicKey().getEncoded())
+                            )
+                    );
+        }
+
+        return certificates;
     }
 }

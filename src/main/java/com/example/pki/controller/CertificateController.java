@@ -1,5 +1,6 @@
 package com.example.pki.controller;
 
+import com.example.pki.dto.CertificateDistributionDto;
 import com.example.pki.dto.CertificateDto;
 import com.example.pki.dto.CertificateValidityDto;
 import com.example.pki.dto.CreateCertificateDto;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Collection;
 
 @RestController
 @RequestMapping("/api/v1/certificates")
@@ -26,6 +29,13 @@ public class CertificateController {
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CertificateDto> getAllCertificates() {
         return new ResponseEntity<>(certificateService.getCertificateTree(), HttpStatus.OK);
+    }
+
+    @GetMapping(path = "/distribute", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Collection<CertificateDistributionDto>> distributeCertificates(
+            @RequestParam(name = "recipient_email") String recipientEmail
+    ) {
+        return new ResponseEntity<>(certificateService.getCertificatesForRecipient(recipientEmail), HttpStatus.OK);
     }
 
     @GetMapping(path="/valid", produces = MediaType.APPLICATION_JSON_VALUE)
