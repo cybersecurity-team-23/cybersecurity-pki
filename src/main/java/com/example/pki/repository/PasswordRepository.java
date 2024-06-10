@@ -1,62 +1,45 @@
 package com.example.pki.repository;
 
+import com.example.pki.exception.HttpTransferException;
 import com.opencsv.CSVReader;
-import com.opencsv.CSVWriter;
+import com.opencsv.exceptions.CsvValidationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
 import java.io.FileReader;
-import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
 
 @Repository
 public class PasswordRepository {
-    private final String passwordFilepath = "src/main/resources/passwords-and-private-keys/keyStorePasswords.csv";
-
-    public void writePassword(String keyStoreName, String password) {
-        try {
-            FileWriter fw = new FileWriter(this.passwordFilepath, true);
-            CSVWriter writer = new CSVWriter(fw);
-            writer.writeNext(new String[]{keyStoreName, password});
-            writer.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    public static final String keyStorePasswordsFilePath =
+            "src/main/resources/passwords-and-private-keys/keyStorePasswords.csv";
 
     public String getPassword(String keyStoreName) {
         try {
-            FileReader fr = new FileReader(this.passwordFilepath);
+            FileReader fr = new FileReader(keyStorePasswordsFilePath);
             CSVReader reader = new CSVReader(fr);
             String[] entry;
             while (true) {
                 entry = reader.readNext();
-                if (entry == null) break;
-                if (entry[0].equals(keyStoreName)) return entry[1];
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
+                if (entry == null) {
+                    reader.close();
+                    fr.close();
+                    break;
+                }
 
-    public void removePassword(String keyStoreName) {
-        try {
-            FileReader fr = new FileReader(this.passwordFilepath);
-            CSVReader reader = new CSVReader(fr);
-            List<String[]> entries = new ArrayList<>();
-            String[] entry;
-            while (true) {
-                entry = reader.readNext();
-                if (entry == null) break;
-                if (!entry[0].equals(keyStoreName)) entries.add(entry);
+                if (entry[0].equals(keyStoreName)) {
+                    reader.close();
+                    fr.close();
+                    return entry[1];
+                }
             }
-            FileWriter fw = new FileWriter(this.passwordFilepath);
-            CSVWriter writer = new CSVWriter(fw);
-            writer.writeAll(entries);
-            writer.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (CsvValidationException | IOException e) {
+            throw new HttpTransferException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "The certificate store could not be accessed."
+            );
         }
+
+        return null;
     }
 }
